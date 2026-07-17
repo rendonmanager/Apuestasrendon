@@ -211,7 +211,7 @@ function defaultData(){
 
 async function loadData(){
   try{
-    const r=await window.storage.get(STORE_KEY,false);
+    const r=await localStorage.getItem(STORE_KEY,false);
     if(r && r.value){ DATA=JSON.parse(r.value); return; }
   }catch(e){ /* not found */ }
   DATA=defaultData();
@@ -223,7 +223,7 @@ async function saveData(){
   clearTimeout(saveTimer);
   return new Promise(res=>{
     saveTimer=setTimeout(async()=>{
-      try{ await window.storage.set(STORE_KEY, JSON.stringify(DATA), false); }
+      try{ await localStorage.setItem(STORE_KEY, JSON.stringify(DATA), false); }
       catch(e){ console.error('Error guardando',e); toast('⚠️ Error al guardar los datos'); }
       res();
     },150);
