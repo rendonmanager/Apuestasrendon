@@ -1,0 +1,1158 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bankroll Pro — Gestión de Tipster</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.4/chart.umd.min.js"></script>
+<style>
+:root{
+  --bg:#0B0F14; --surface:#131920; --surface-alt:#1B232C; --surface-hi:#212B35;
+  --border:#26313C; --text:#E8ECEF; --muted:#8B96A3; --muted-2:#5C6773;
+  --gold:#C9A227; --gold-soft:#E8C766; --teal:#2DD4BF;
+  --pos:#22C55E; --neg:#EF4444; --warn:#F59E0B; --neutral:#64748B;
+  --radius:10px; --radius-sm:6px;
+  --font-display:'Space Grotesk',sans-serif; --font-body:'Inter',sans-serif; --font-mono:'JetBrains Mono',monospace;
+}
+[data-theme="light"]{
+  --bg:#F3F4F1; --surface:#FFFFFF; --surface-alt:#F6F7F5; --surface-hi:#EDEEEA;
+  --border:#DDE0DA; --text:#171A1D; --muted:#5B6169; --muted-2:#8A909A;
+  --gold:#A9800F; --gold-soft:#C9A227; --teal:#0E8C7F;
+}
+*{box-sizing:border-box; margin:0; padding:0;}
+body{background:var(--bg); color:var(--text); font-family:var(--font-body); font-size:14px; line-height:1.5; -webkit-font-smoothing:antialiased;}
+::selection{background:var(--gold); color:#0B0F14;}
+::-webkit-scrollbar{width:9px;height:9px;} ::-webkit-scrollbar-thumb{background:var(--surface-hi); border-radius:8px;}
+h1,h2,h3,h4{font-family:var(--font-display); font-weight:600; letter-spacing:-0.01em;}
+.mono{font-family:var(--font-mono);}
+button{font-family:var(--font-body); cursor:pointer;}
+input,select,textarea{font-family:var(--font-body); background:var(--surface-alt); border:1px solid var(--border); color:var(--text); border-radius:var(--radius-sm); padding:8px 10px; font-size:13px; width:100%;}
+input:focus,select:focus,textarea:focus{outline:2px solid var(--gold); outline-offset:1px; border-color:var(--gold);}
+label{font-size:11.5px; color:var(--muted); display:block; margin-bottom:4px; font-weight:500; text-transform:uppercase; letter-spacing:.03em;}
+.field{margin-bottom:12px;}
+.grid{display:grid; gap:12px;}
+.grid-2{grid-template-columns:1fr 1fr;} .grid-3{grid-template-columns:repeat(3,1fr);} .grid-4{grid-template-columns:repeat(4,1fr);}
+@media(max-width:720px){.grid-2,.grid-3,.grid-4{grid-template-columns:1fr;}}
+
+/* Layout */
+.app{display:flex; min-height:100vh;}
+.sidebar{width:230px; background:var(--surface); border-right:1px solid var(--border); position:fixed; top:0; left:0; bottom:0; display:flex; flex-direction:column; z-index:40; transition:transform .2s;}
+.sidebar-brand{padding:20px 18px 16px; border-bottom:1px solid var(--border);}
+.sidebar-brand .name{font-family:var(--font-display); font-size:16px; font-weight:700; letter-spacing:-.02em;}
+.sidebar-brand .tag{font-size:10.5px; color:var(--muted); text-transform:uppercase; letter-spacing:.08em; margin-top:2px;}
+.nav{flex:1; overflow-y:auto; padding:10px;}
+.nav button{display:flex; align-items:center; gap:10px; width:100%; text-align:left; background:transparent; border:none; color:var(--muted); padding:9px 12px; border-radius:var(--radius-sm); font-size:13px; font-weight:500; margin-bottom:2px;}
+.nav button:hover{background:var(--surface-alt); color:var(--text);}
+.nav button.active{background:var(--surface-hi); color:var(--gold-soft); box-shadow:inset 2px 0 0 var(--gold);}
+.nav .icon{width:16px; text-align:center; opacity:.85; font-size:14px;}
+.sidebar-foot{padding:12px; border-top:1px solid var(--border); display:flex; gap:8px;}
+.theme-toggle{flex:1; background:var(--surface-alt); border:1px solid var(--border); color:var(--text); border-radius:var(--radius-sm); padding:8px; font-size:12px; font-weight:600;}
+.main{margin-left:230px; flex:1; min-width:0;}
+.topbar{position:sticky; top:0; background:rgba(11,15,20,.85); backdrop-filter:blur(8px); border-bottom:1px solid var(--border); padding:14px 26px; display:flex; align-items:center; justify-content:space-between; z-index:30;}
+[data-theme="light"] .topbar{background:rgba(243,244,241,.85);}
+.topbar h1{font-size:19px;}
+.menu-btn{display:none; background:none; border:none; color:var(--text); font-size:20px;}
+.content{padding:22px 26px 60px;}
+.disclaimer{background:var(--surface-alt); border:1px solid var(--border); border-left:3px solid var(--gold); color:var(--muted); font-size:11.5px; padding:9px 14px; border-radius:var(--radius-sm); margin-bottom:18px;}
+.tabpanel{display:none;}
+.tabpanel.active{display:block; animation:fadein .18s ease;}
+@keyframes fadein{from{opacity:0; transform:translateY(3px);} to{opacity:1; transform:translateY(0);}}
+
+/* Cards */
+.card{background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:16px;}
+.kpi{background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:14px 16px; position:relative; overflow:hidden;}
+.kpi .lbl{font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:.05em; font-weight:600; margin-bottom:6px;}
+.kpi .val{font-family:var(--font-mono); font-size:22px; font-weight:700;}
+.kpi .sub{font-size:11px; color:var(--muted-2); margin-top:4px;}
+.kpi.accent{border-color:var(--gold); box-shadow:0 0 0 1px rgba(201,162,39,.15) inset;}
+.pos{color:var(--pos);} .neg{color:var(--neg);} .warn-c{color:var(--warn);} .gold-c{color:var(--gold-soft);}
+
+/* Ticket hero */
+.ticket{background:linear-gradient(135deg,var(--surface-hi),var(--surface)); border:1px solid var(--border); border-radius:var(--radius); padding:22px 24px; position:relative; margin-bottom:20px; overflow:hidden;}
+.ticket::before,.ticket::after{content:"";position:absolute; width:22px; height:22px; background:var(--bg); border-radius:50%; top:50%; transform:translateY(-50%);}
+.ticket::before{left:-11px;} .ticket::after{right:-11px;}
+.ticket-row{display:flex; justify-content:space-between; align-items:flex-end; flex-wrap:wrap; gap:16px; border-top:1px dashed var(--border); margin-top:14px; padding-top:14px;}
+.ticket-title{font-size:11px; text-transform:uppercase; letter-spacing:.1em; color:var(--gold-soft); font-weight:700;}
+.ticket-amt{font-family:var(--font-mono); font-size:34px; font-weight:700; letter-spacing:-.02em;}
+.ticket-stub{text-align:right;}
+.ticket-stub .l{font-size:10.5px; color:var(--muted); text-transform:uppercase; letter-spacing:.05em;}
+.ticket-stub .v{font-family:var(--font-mono); font-size:15px; font-weight:600;}
+
+/* Buttons */
+.btn{background:var(--surface-alt); border:1px solid var(--border); color:var(--text); padding:8px 14px; border-radius:var(--radius-sm); font-size:12.5px; font-weight:600;}
+.btn:hover{border-color:var(--gold);}
+.btn-gold{background:var(--gold); border-color:var(--gold); color:#14100a;}
+.btn-gold:hover{background:var(--gold-soft);}
+.btn-danger{color:var(--neg); border-color:var(--neg);}
+.btn-sm{padding:5px 9px; font-size:11.5px;}
+.btn-row{display:flex; gap:8px; flex-wrap:wrap;}
+
+/* Table */
+.table-wrap{overflow-x:auto; border:1px solid var(--border); border-radius:var(--radius);}
+table{width:100%; border-collapse:collapse; font-size:12.5px; min-width:1100px;}
+th{text-align:left; background:var(--surface-alt); color:var(--muted); font-weight:600; text-transform:uppercase; font-size:10.5px; letter-spacing:.04em; padding:9px 10px; border-bottom:1px solid var(--border); white-space:nowrap; cursor:pointer;}
+td{padding:8px 10px; border-bottom:1px solid var(--border); white-space:nowrap;}
+tbody tr:hover{background:var(--surface-alt);}
+.badge{display:inline-block; padding:2px 8px; border-radius:20px; font-size:10.5px; font-weight:700; text-transform:uppercase; letter-spacing:.03em;}
+.badge-ganada{background:rgba(34,197,94,.15); color:var(--pos);}
+.badge-perdida{background:rgba(239,68,68,.15); color:var(--neg);}
+.badge-pendiente{background:rgba(245,158,11,.15); color:var(--warn);}
+.badge-nula{background:rgba(100,116,139,.18); color:#cbd3db;}
+.badge-media_ganada{background:rgba(45,212,191,.15); color:var(--teal);}
+.badge-media_perdida{background:rgba(239,68,68,.1); color:#e88;}
+.badge-cash_out{background:rgba(45,212,191,.18); color:var(--teal);}
+
+/* Modal */
+.overlay{position:fixed; inset:0; background:rgba(0,0,0,.6); display:none; align-items:flex-start; justify-content:center; z-index:100; padding:30px 14px; overflow-y:auto;}
+.overlay.active{display:flex;}
+.modal{background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); width:100%; max-width:640px; padding:22px;}
+.modal h2{font-size:17px; margin-bottom:16px;}
+.modal-close{float:right; background:none; border:none; color:var(--muted); font-size:18px;}
+
+/* misc */
+.section-title{font-size:15px; margin:22px 0 12px; display:flex; align-items:center; gap:8px;}
+.section-title:first-child{margin-top:0;}
+.empty{text-align:center; padding:40px 20px; color:var(--muted);}
+.empty .big{font-size:30px; margin-bottom:8px;}
+.chart-box{position:relative; height:280px;}
+.chart-box.small{height:200px;}
+.filters{display:flex; gap:8px; flex-wrap:wrap; margin-bottom:12px;}
+.filters input,.filters select{width:auto; min-width:120px;}
+.tag{background:var(--surface-hi); border:1px solid var(--border); padding:5px 11px; border-radius:20px; font-size:11.5px; font-weight:600; color:var(--muted); cursor:pointer;}
+.tag.active{border-color:var(--gold); color:var(--gold-soft);}
+.tooltip-i{display:inline-flex; width:14px; height:14px; border-radius:50%; background:var(--surface-hi); color:var(--muted); font-size:10px; align-items:center; justify-content:center; cursor:help; margin-left:4px;}
+.alert{padding:10px 14px; border-radius:var(--radius-sm); font-size:12.5px; margin-bottom:8px; border-left:3px solid; display:flex; gap:10px; align-items:flex-start;}
+.alert-warn{background:rgba(245,158,11,.08); border-color:var(--warn); color:#f0c584;}
+.alert-danger{background:rgba(239,68,68,.08); border-color:var(--neg); color:#f0a1a1;}
+.alert-info{background:rgba(45,212,191,.08); border-color:var(--teal); color:#9fe7dd;}
+.calendar{display:grid; grid-template-columns:repeat(7,1fr); gap:6px;}
+.cal-cell{background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-sm); min-height:64px; padding:6px; font-size:11px; cursor:pointer;}
+.cal-cell.empty-c{background:transparent; border:none; cursor:default;}
+.cal-cell .d{font-weight:700; font-family:var(--font-mono); font-size:12px;}
+.cal-cell.pos-day{border-color:var(--pos); background:rgba(34,197,94,.07);}
+.cal-cell.neg-day{border-color:var(--neg); background:rgba(239,68,68,.07);}
+.cal-cell.pend-day{border-color:var(--warn); background:rgba(245,158,11,.07);}
+.toast-wrap{position:fixed; bottom:18px; right:18px; z-index:200; display:flex; flex-direction:column; gap:8px;}
+.toast{background:var(--surface-hi); border:1px solid var(--gold); color:var(--text); padding:10px 16px; border-radius:var(--radius-sm); font-size:12.5px; box-shadow:0 8px 24px rgba(0,0,0,.3); animation:fadein .2s;}
+.pill-list{display:flex; gap:6px; flex-wrap:wrap;}
+.pill-x{background:var(--surface-hi); border:1px solid var(--border); border-radius:20px; padding:4px 8px 4px 11px; font-size:11.5px; display:flex; align-items:center; gap:6px;}
+.pill-x button{background:none; border:none; color:var(--muted); font-size:13px;}
+.loading-screen{position:fixed; inset:0; background:var(--bg); display:flex; align-items:center; justify-content:center; flex-direction:column; gap:10px; z-index:500; color:var(--muted); font-family:var(--font-mono); font-size:12px;}
+.spinner{width:22px; height:22px; border:2px solid var(--surface-hi); border-top-color:var(--gold); border-radius:50%; animation:spin .7s linear infinite;}
+@keyframes spin{to{transform:rotate(360deg);}}
+.hidden{display:none !important;}
+.risk-bar{height:8px; background:var(--surface-alt); border-radius:6px; overflow:hidden; margin-top:6px;}
+.risk-bar-fill{height:100%; border-radius:6px;}
+@media(max-width:900px){
+  .sidebar{transform:translateX(-100%);} .sidebar.open{transform:translateX(0);}
+  .main{margin-left:0;} .menu-btn{display:block;}
+}
+</style>
+</head>
+<body data-theme="dark">
+
+<div class="loading-screen" id="loadingScreen"><div class="spinner"></div><div>Cargando bankroll…</div></div>
+
+<div class="app hidden" id="appRoot">
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-brand">
+      <div class="name" id="brandName">Bankroll Pro</div>
+      <div class="tag" id="brandTag">Panel del Tipster</div>
+    </div>
+    <nav class="nav" id="navMenu"></nav>
+    <div class="sidebar-foot">
+      <button class="theme-toggle" id="themeToggle">🌙 Modo oscuro</button>
+    </div>
+  </aside>
+
+  <div class="main">
+    <div class="topbar">
+      <div style="display:flex;align-items:center;gap:10px;">
+        <button class="menu-btn" id="menuBtn">☰</button>
+        <h1 id="pageTitle">Resumen general</h1>
+      </div>
+      <div class="btn-row">
+        <button class="btn" id="btnBackup">Copia de seguridad</button>
+        <button class="btn btn-gold" id="btnNewBet">+ Nueva apuesta</button>
+      </div>
+    </div>
+    <div class="content">
+      <div class="disclaimer">⚠️ Las apuestas deportivas implican riesgo financiero. Los resultados pasados no garantizan resultados futuros. Esta herramienta está diseñada para registrar y analizar información, no para garantizar ganancias.</div>
+      <div id="panels"></div>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="overlay"><div class="modal" id="modalBody"></div></div>
+<div class="toast-wrap" id="toastWrap"></div>
+
+<script>
+/* ============================= STORAGE ============================= */
+const STORE_KEY='tipster-app-data-v1';
+let DATA=null;
+let CHARTS={};
+
+function defaultData(){
+  return {
+    config:{
+      nombre:'Mi Proyecto Tipster', moneda:'COP', bankrollInicial:2000000,
+      fechaInicio:new Date().toISOString().slice(0,10), valorUnidad:20000,
+      metodoUnidad:'fijo', porcentajeUnidad:1, bankrollObjetivo:5000000,
+      limiteApuestaPct:5, limitePerdidaDiariaPct:10, limitePerdidaSemanalPct:20,
+      drawdownAlertaPct:25, rachaPerdidasAlerta:4,
+      deportes:['Fútbol','Baloncesto','Tenis'], casas:['Bet365','Betplay','Wplay']
+    },
+    bets:[], movements:[], diary:[], picks:[],
+    ui:{theme:'dark', demoSeeded:false}
+  };
+}
+
+async function loadData(){
+  try{
+    const r=await localStorage.getItem(STORE_KEY,false);
+    if(r && r.value){ DATA=JSON.parse(r.value); return; }
+  }catch(e){ /* not found */ }
+  DATA=defaultData();
+  seedDemoData();
+  await saveData();
+}
+let saveTimer=null;
+async function saveData(){
+  clearTimeout(saveTimer);
+  return new Promise(res=>{
+    saveTimer=setTimeout(async()=>{
+      try{ await localStorage.setItem(STORE_KEY, JSON.stringify(DATA), false); }
+      catch(e){ console.error('Error guardando',e); toast('⚠️ Error al guardar los datos'); }
+      res();
+    },150);
+  });
+}
+
+/* ============================= HELPERS ============================= */
+const uid=()=>Math.random().toString(36).slice(2,10)+Date.now().toString(36).slice(-4);
+function fmtMoney(n){
+  if(n===null||n===undefined||isNaN(n)) return '—';
+  const cur=DATA.config.moneda;
+  const sign=n<0?'-':'';
+  const abs=Math.abs(n);
+  let str=abs.toLocaleString('es-CO',{maximumFractionDigits:0});
+  const symbols={COP:'$',USD:'US$',EUR:'€'};
+  return sign+(symbols[cur]||cur+' ')+str;
+}
+function fmtPct(n,dec=2){ if(n===null||n===undefined||isNaN(n)) return '—'; return (n>0?'+':'')+n.toFixed(dec)+'%'; }
+function fmtNum(n,dec=2){ if(n===null||n===undefined||isNaN(n)) return '—'; return n.toFixed(dec); }
+function fmtDate(d){ if(!d) return '—'; const dt=new Date(d+'T00:00:00'); return dt.toLocaleDateString('es-CO',{day:'2-digit',month:'short',year:'numeric'}); }
+function todayStr(){ return new Date().toISOString().slice(0,10); }
+function toast(msg){
+  const el=document.createElement('div'); el.className='toast'; el.textContent=msg;
+  document.getElementById('toastWrap').appendChild(el);
+  setTimeout(()=>el.remove(),3200);
+}
+function esc(s){ return (s===undefined||s===null)?'':String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+/* ============================= CALC ENGINE ============================= */
+function calcularApuesta(b){
+  const stake=Number(b.stake)||0, cuota=Number(b.cuota)||0;
+  let ganancia=0, retorno=0;
+  switch(b.estado){
+    case 'pendiente': return {ganancia:null, retorno:null};
+    case 'ganada': retorno=stake*cuota; ganancia=retorno-stake; break;
+    case 'perdida': ganancia=-stake; retorno=0; break;
+    case 'nula': ganancia=0; retorno=stake; break;
+    case 'media_ganada':{
+      const half=stake/2; const retW=half*cuota;
+      ganancia=(retW-half); retorno=retW+half; break;
+    }
+    case 'media_perdida':{
+      const half=stake/2; ganancia=-half; retorno=half; break;
+    }
+    case 'cash_out':{
+      const vr=Number(b.valorRecibido)||0; ganancia=vr-stake; retorno=vr; break;
+    }
+    default: ganancia=0; retorno=0;
+  }
+  return {ganancia, retorno};
+}
+function valorUnidadActual(){
+  const c=DATA.config;
+  if(c.metodoUnidad==='porcentaje'){ return bankrollActual()*(c.porcentajeUnidad/100); }
+  return Number(c.valorUnidad)||1;
+}
+function movimientosNeto(){
+  return DATA.movements.reduce((s,m)=>{
+    const v=Number(m.monto)||0;
+    return s + (m.tipo==='retiro'? -v : v);
+  },0);
+}
+function apuestasResueltas(){ return DATA.bets.filter(b=>b.estado!=='pendiente'); }
+function gananciaNetaTotal(){ return apuestasResueltas().reduce((s,b)=>s+(Number(b.gananciaNeta)||0),0); }
+function bankrollActual(){ return (Number(DATA.config.bankrollInicial)||0) + movimientosNeto() + gananciaNetaTotal(); }
+function totalApostado(){ return apuestasResueltas().reduce((s,b)=>s+(Number(b.stake)||0),0); }
+function totalGanado(){ return apuestasResueltas().filter(b=>(b.gananciaNeta||0)>0).reduce((s,b)=>s+b.gananciaNeta,0); }
+function totalPerdido(){ return Math.abs(apuestasResueltas().filter(b=>(b.gananciaNeta||0)<0).reduce((s,b)=>s+b.gananciaNeta,0)); }
+function roi(){ const ta=totalApostado(); return ta? (gananciaNetaTotal()/ta*100):0; }
+function rentabilidadInicial(){ const bi=Number(DATA.config.bankrollInicial)||1; return gananciaNetaTotal()/bi*100; }
+function unidadesGP(){ const vu=valorUnidadActual()||1; return gananciaNetaTotal()/vu; }
+function unidadesApostadas(){ const vu=valorUnidadActual()||1; return totalApostado()/vu; }
+function yieldPct(){ const ua=unidadesApostadas(); return ua? (unidadesGP()/ua*100):0; }
+function pctAcierto(){
+  const resueltas=apuestasResueltas().filter(b=>b.estado!=='nula');
+  const ganadas=resueltas.filter(b=>['ganada','media_ganada','cash_out'].includes(b.estado) && (b.gananciaNeta||0)>0);
+  return resueltas.length? (ganadas.length/resueltas.length*100):0;
+}
+function profitFactor(){ const tp=totalGanado(), tl=totalPerdido(); return tl? tp/tl : (tp?Infinity:0); }
+function cuotaPromedio(){ const r=apuestasResueltas(); return r.length? r.reduce((s,b)=>s+Number(b.cuota),0)/r.length : 0; }
+function cuotaPromedioPonderada(){
+  const r=apuestasResueltas(); const ts=r.reduce((s,b)=>s+Number(b.stake),0);
+  return ts? r.reduce((s,b)=>s+Number(b.cuota)*Number(b.stake),0)/ts : 0;
+}
+function bankrollComprometido(){ return DATA.bets.filter(b=>b.estado==='pendiente').reduce((s,b)=>s+(Number(b.stake)||0),0); }
+
+function bankrollSeries(){
+  const events=[];
+  DATA.movements.forEach(m=>events.push({fecha:m.fecha, delta:(m.tipo==='retiro'?-1:1)*(Number(m.monto)||0), t:new Date(m.fecha).getTime()}));
+  apuestasResueltas().forEach(b=>events.push({fecha:b.fechaResolucion||b.fecha, delta:Number(b.gananciaNeta)||0, t:new Date(b.fechaResolucion||b.fecha).getTime()}));
+  events.sort((a,b)=>a.t-b.t);
+  let running=Number(DATA.config.bankrollInicial)||0;
+  const series=[{fecha:DATA.config.fechaInicio, valor:running}];
+  events.forEach(e=>{ running+=e.delta; series.push({fecha:e.fecha, valor:running}); });
+  return series;
+}
+function maxDrawdown(){
+  const s=bankrollSeries(); let peak=s[0]?s[0].valor:0, maxDD=0, maxDDpct=0, peakVal=peak;
+  s.forEach(p=>{
+    if(p.valor>peak){ peak=p.valor; }
+    const dd=peak-p.valor; const ddpct=peak? dd/peak*100:0;
+    if(dd>maxDD){ maxDD=dd; maxDDpct=ddpct; }
+  });
+  return {maxDD, maxDDpct};
+}
+function bankrollMaxMin(){
+  const s=bankrollSeries().map(p=>p.valor);
+  return {max:Math.max(...s), min:Math.min(...s)};
+}
+function rachas(){
+  const resueltas=DATA.bets.filter(b=>b.estado!=='pendiente'&&b.estado!=='nula').sort((a,b)=>new Date(a.fecha)-new Date(b.fecha));
+  let best=0,worst=0,cur=0,curType=null;
+  resueltas.forEach(b=>{
+    const win=(b.gananciaNeta||0)>0;
+    if(curType===win){ cur++; } else { cur=1; curType=win; }
+    if(win) best=Math.max(best,cur); else worst=Math.max(worst,cur);
+  });
+  return {best, worst};
+}
+function rachaActualPerdidas(){
+  const resueltas=[...DATA.bets].filter(b=>b.estado!=='pendiente'&&b.estado!=='nula').sort((a,b)=>new Date(b.fecha)-new Date(a.fecha));
+  let cur=0;
+  for(const b of resueltas){ if((b.gananciaNeta||0)<0){ cur++; } else break; }
+  return cur;
+}
+
+/* ============================= DEMO DATA ============================= */
+function seedDemoData(){
+  const deportes=['Fútbol','Baloncesto','Tenis'];
+  const ligas={Fútbol:['Liga BetPlay','Champions League','Premier League'],Baloncesto:['NBA','Liga Colombiana'],Tenis:['ATP 250','WTA 500']};
+  const mercados=['1X2','Over/Under 2.5','Ambos anotan','Hándicap','Total puntos','Ganador de set'];
+  const casas=['Bet365','Betplay','Wplay'];
+  const estados=['ganada','ganada','perdida','perdida','perdida','nula','pendiente','media_ganada','media_perdida'];
+  const start=new Date(); start.setMonth(start.getMonth()-4);
+  for(let i=0;i<28;i++){
+    const dt=new Date(start.getTime()+i*3.6*24*3600*1000);
+    const dep=deportes[i%deportes.length];
+    const liga=ligas[dep][i%ligas[dep].length];
+    const cuota=+(1.4+Math.random()*2.4).toFixed(2);
+    const stake=[50000,80000,100000,120000,150000][i%5];
+    const estado=estados[i%estados.length];
+    const fecha=dt.toISOString().slice(0,10);
+    const bet={
+      id:uid(), fecha, hora:'19:'+(10+i%40), deporte:dep, liga, evento:`Equipo ${1+i%10} vs Equipo ${11+i%8}`,
+      mercado:mercados[i%mercados.length], seleccion:'Selección '+(i%2?'Local':'Visitante'), casa:casas[i%casas.length],
+      cuota, stake, tipo: i%4===0?'combinada':'simple', categoria:['conservador','moderado','agresivo'][i%3],
+      estado, valorRecibido: estado==='cash_out'? Math.round(stake*1.3):null,
+      fechaResolucion:fecha, tipster:'Analista Principal', etiquetas:i%3===0?'value bet':'', comentarios:'',
+      publicado:i%3===0, cuotaCierre:+(cuota+(Math.random()*0.3-0.1)).toFixed(2),
+      createdAt:new Date(dt).toISOString(), editHistory:[]
+    };
+    const c=calcularApuesta(bet); bet.gananciaNeta=c.ganancia; bet.retornoTotal=c.retorno;
+    DATA.bets.push(bet);
+  }
+  DATA.movements.push({id:uid(), fecha:DATA.config.fechaInicio, tipo:'deposito', monto:0, nota:'Apertura de bankroll'});
+  DATA.ui.demoSeeded=true;
+}
+function clearDemoData(){
+  DATA.bets=[]; DATA.movements=[]; DATA.diary=[]; DATA.picks=[]; DATA.ui.demoSeeded=false;
+  saveData(); render(); toast('Datos de demostración eliminados. Bankroll reiniciado.');
+}
+
+/* ============================= NAV / TABS ============================= */
+const TABS=[
+  {id:'dashboard', label:'Dashboard', icon:'◆'},
+  {id:'apuestas', label:'Apuestas', icon:'▤'},
+  {id:'bankroll', label:'Bankroll', icon:'▲'},
+  {id:'calendario', label:'Calendario', icon:'▦'},
+  {id:'analisis', label:'Análisis', icon:'◈'},
+  {id:'riesgo', label:'Gestión de riesgo', icon:'⚠'},
+  {id:'picks', label:'Picks publicados', icon:'★'},
+  {id:'diario', label:'Diario', icon:'✎'},
+  {id:'reportes', label:'Reportes', icon:'▣'},
+  {id:'config', label:'Configuración', icon:'⚙'},
+];
+let currentTab='dashboard';
+
+function buildNav(){
+  const nav=document.getElementById('navMenu');
+  nav.innerHTML=TABS.map(t=>`<button data-tab="${t.id}" class="${t.id===currentTab?'active':''}"><span class="icon">${t.icon}</span>${t.label}</button>`).join('');
+  nav.querySelectorAll('button').forEach(b=>b.addEventListener('click',()=>{ currentTab=b.dataset.tab; render(); document.getElementById('sidebar').classList.remove('open'); }));
+}
+
+/* ============================= RENDER ROOT ============================= */
+function render(){
+  buildNav();
+  document.getElementById('pageTitle').textContent=TABS.find(t=>t.id===currentTab).label;
+  document.getElementById('brandName').textContent=DATA.config.nombre||'Bankroll Pro';
+  const panels=document.getElementById('panels');
+  const renderers={
+    dashboard:renderDashboard, apuestas:renderApuestas, bankroll:renderBankroll,
+    calendario:renderCalendario, analisis:renderAnalisis, riesgo:renderRiesgo,
+    picks:renderPicks, diario:renderDiario, reportes:renderReportes, config:renderConfig
+  };
+  panels.innerHTML=`<div class="tabpanel active" id="panel-${currentTab}"></div>`;
+  renderers[currentTab](document.getElementById('panel-'+currentTab));
+}
+
+/* ============================= DASHBOARD ============================= */
+function compareWindow(days){
+  const cutoff=Date.now()-days*24*3600*1000;
+  return DATA.bets.filter(b=>b.estado!=='pendiente' && new Date(b.fechaResolucion||b.fecha).getTime()>=cutoff)
+    .reduce((s,b)=>s+(Number(b.gananciaNeta)||0),0);
+}
+function renderDashboard(el){
+  const ba=bankrollActual(), bi=Number(DATA.config.bankrollInicial)||0;
+  const dd=maxDrawdown();
+  const rc=rachas();
+  const kpis=[
+    ['Bankroll actual', fmtMoney(ba), ba>=bi?'pos':'neg', true],
+    ['Ganancia / pérdida neta', fmtMoney(gananciaNetaTotal()), gananciaNetaTotal()>=0?'pos':'neg'],
+    ['Rentabilidad s/ inicial', fmtPct(rentabilidadInicial()), rentabilidadInicial()>=0?'pos':'neg'],
+    ['ROI', fmtPct(roi()), roi()>=0?'pos':'neg'],
+    ['Yield', fmtPct(yieldPct()), yieldPct()>=0?'pos':'neg'],
+    ['% de acierto', fmtNum(pctAcierto(),1)+'%', ''],
+    ['Total apuestas', DATA.bets.length, ''],
+    ['Ganadas / Perdidas', apuestasResueltas().filter(b=>(b.gananciaNeta||0)>0).length+' / '+apuestasResueltas().filter(b=>(b.gananciaNeta||0)<0).length, ''],
+    ['Pendientes / Nulas', DATA.bets.filter(b=>b.estado==='pendiente').length+' / '+DATA.bets.filter(b=>b.estado==='nula').length, ''],
+    ['Cuota promedio', fmtNum(cuotaPromedio()), ''],
+    ['Stake promedio', fmtMoney(apuestasResueltas().length? totalApostado()/apuestasResueltas().length:0), ''],
+    ['Unidades G/P', fmtNum(unidadesGP())+' u', unidadesGP()>=0?'pos':'neg'],
+    ['Mejor / peor racha', rc.best+' / '+rc.worst, ''],
+    ['Drawdown máximo', fmtPct(-dd.maxDDpct), 'neg'],
+    ['Profit factor', profitFactor()===Infinity?'∞':fmtNum(profitFactor()), ''],
+    ['Bankroll comprometido', fmtMoney(bankrollComprometido()), ''],
+  ];
+  el.innerHTML=`
+  <div class="ticket">
+    <div class="ticket-title">${esc(DATA.config.nombre)} · Estado del bankroll</div>
+    <div class="ticket-amt ${ba>=bi?'pos':'neg'} mono">${fmtMoney(ba)}</div>
+    <div class="ticket-row">
+      <div><div class="ticket-stub l">Bankroll inicial</div><div class="ticket-stub v">${fmtMoney(bi)}</div></div>
+      <div><div class="ticket-stub l">Objetivo</div><div class="ticket-stub v">${fmtMoney(DATA.config.bankrollObjetivo)}</div></div>
+      <div><div class="ticket-stub l">Falta para objetivo</div><div class="ticket-stub v">${fmtMoney(Math.max(0,(Number(DATA.config.bankrollObjetivo)||0)-ba))}</div></div>
+      <div><div class="ticket-stub l">Vs. día / semana / mes</div><div class="ticket-stub v"><span class="${compareWindow(1)>=0?'pos':'neg'}">${fmtMoney(compareWindow(1))}</span> · <span class="${compareWindow(7)>=0?'pos':'neg'}">${fmtMoney(compareWindow(7))}</span> · <span class="${compareWindow(30)>=0?'pos':'neg'}">${fmtMoney(compareWindow(30))}</span></div></div>
+    </div>
+  </div>
+  <div class="grid grid-4" id="kpiGrid"></div>
+  <div class="section-title">Evolución del bankroll</div>
+  <div class="card"><div class="chart-box"><canvas id="chartBankroll"></canvas></div></div>
+  <div class="grid grid-2" style="margin-top:16px;">
+    <div><div class="section-title">Ganancia/pérdida mensual</div><div class="card"><div class="chart-box small"><canvas id="chartMonthly"></canvas></div></div></div>
+    <div><div class="section-title">Resultados por deporte</div><div class="card"><div class="chart-box small"><canvas id="chartSport"></canvas></div></div></div>
+  </div>`;
+  const grid=el.querySelector('#kpiGrid');
+  grid.innerHTML=kpis.map(k=>`<div class="kpi ${k[3]?'accent':''}"><div class="lbl">${k[0]}</div><div class="val ${k[2]}">${k[1]}</div></div>`).join('');
+  drawBankrollChart('chartBankroll','all');
+  drawMonthlyChart('chartMonthly');
+  drawSportChart('chartSport');
+}
+
+function drawBankrollChart(canvasId, range){
+  const s=bankrollSeries();
+  let filtered=s;
+  const now=Date.now();
+  const days={'7':7,'30':30,'90':90,'180':180,'year':daysInYear(),'all':null}[range];
+  if(days){ filtered=s.filter(p=>new Date(p.fecha).getTime()>=now-days*24*3600*1000); if(filtered.length<2) filtered=s.slice(-2); }
+  const ctx=document.getElementById(canvasId); if(!ctx) return;
+  if(CHARTS[canvasId]) CHARTS[canvasId].destroy();
+  CHARTS[canvasId]=new Chart(ctx,{type:'line',data:{labels:filtered.map(p=>fmtDate(p.fecha)),datasets:[{label:'Bankroll',data:filtered.map(p=>p.valor),borderColor:'#C9A227',backgroundColor:'rgba(201,162,39,.12)',fill:true,tension:.25,pointRadius:0,borderWidth:2}]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{ticks:{color:'#8B96A3',maxTicksLimit:8},grid:{color:'rgba(255,255,255,.04)'}},y:{ticks:{color:'#8B96A3'},grid:{color:'rgba(255,255,255,.04)'}}}}});
+}
+function daysInYear(){ const s=new Date(new Date().getFullYear(),0,1); return Math.ceil((Date.now()-s)/86400000); }
+function drawMonthlyChart(canvasId){
+  const byMonth={};
+  apuestasResueltas().forEach(b=>{ const m=(b.fechaResolucion||b.fecha).slice(0,7); byMonth[m]=(byMonth[m]||0)+(b.gananciaNeta||0); });
+  const keys=Object.keys(byMonth).sort();
+  const ctx=document.getElementById(canvasId); if(!ctx) return;
+  if(CHARTS[canvasId]) CHARTS[canvasId].destroy();
+  CHARTS[canvasId]=new Chart(ctx,{type:'bar',data:{labels:keys,datasets:[{data:keys.map(k=>byMonth[k]),backgroundColor:keys.map(k=>byMonth[k]>=0?'#22C55E':'#EF4444')}]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{ticks:{color:'#8B96A3'},grid:{display:false}},y:{ticks:{color:'#8B96A3'},grid:{color:'rgba(255,255,255,.04)'}}}}});
+}
+function drawSportChart(canvasId){
+  const byS={};
+  apuestasResueltas().forEach(b=>{ byS[b.deporte]=(byS[b.deporte]||0)+(b.gananciaNeta||0); });
+  const keys=Object.keys(byS);
+  const ctx=document.getElementById(canvasId); if(!ctx) return;
+  if(CHARTS[canvasId]) CHARTS[canvasId].destroy();
+  CHARTS[canvasId]=new Chart(ctx,{type:'bar',data:{labels:keys,datasets:[{data:keys.map(k=>byS[k]),backgroundColor:keys.map(k=>byS[k]>=0?'#2DD4BF':'#EF4444')}]},
+    options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{ticks:{color:'#8B96A3'},grid:{color:'rgba(255,255,255,.04)'}},y:{ticks:{color:'#8B96A3'},grid:{display:false}}}}});
+}
+
+/* ============================= APUESTAS ============================= */
+let betFilters={q:'',deporte:'',estado:'',casa:'',from:'',to:''};
+let betSort={col:'fecha',dir:-1};
+function filteredBets(){
+  let list=[...DATA.bets];
+  const f=betFilters;
+  if(f.q) list=list.filter(b=>JSON.stringify(b).toLowerCase().includes(f.q.toLowerCase()));
+  if(f.deporte) list=list.filter(b=>b.deporte===f.deporte);
+  if(f.estado) list=list.filter(b=>b.estado===f.estado);
+  if(f.casa) list=list.filter(b=>b.casa===f.casa);
+  if(f.from) list=list.filter(b=>b.fecha>=f.from);
+  if(f.to) list=list.filter(b=>b.fecha<=f.to);
+  list.sort((a,b)=>{
+    let va=a[betSort.col], vb=b[betSort.col];
+    if(typeof va==='string') return va.localeCompare(vb)*betSort.dir;
+    return ((va||0)-(vb||0))*betSort.dir;
+  });
+  return list;
+}
+function renderApuestas(el){
+  const list=filteredBets();
+  el.innerHTML=`
+  <div class="filters">
+    <input type="text" placeholder="Buscar…" id="fq" value="${esc(betFilters.q)}">
+    <select id="fdeporte"><option value="">Deporte (todos)</option>${DATA.config.deportes.map(d=>`<option ${betFilters.deporte===d?'selected':''}>${esc(d)}</option>`).join('')}</select>
+    <select id="festado"><option value="">Estado (todos)</option>${['pendiente','ganada','perdida','nula','media_ganada','media_perdida','cash_out'].map(s=>`<option value="${s}" ${betFilters.estado===s?'selected':''}>${estadoLabel(s)}</option>`).join('')}</select>
+    <select id="fcasa"><option value="">Casa (todas)</option>${DATA.config.casas.map(c=>`<option ${betFilters.casa===c?'selected':''}>${esc(c)}</option>`).join('')}</select>
+    <input type="date" id="ffrom" value="${betFilters.from}">
+    <input type="date" id="fto" value="${betFilters.to}">
+    <button class="btn btn-sm" id="fclear">Limpiar filtros</button>
+  </div>
+  <div class="table-wrap"><table><thead><tr>
+    ${['fecha','deporte','evento','mercado','casa','cuota','stake','estado','gananciaNeta','retornoTotal'].map(c=>`<th data-col="${c}">${colLabel(c)} ${betSort.col===c?(betSort.dir>0?'↑':'↓'):''}</th>`).join('')}
+    <th>Acciones</th>
+  </tr></thead><tbody>
+  ${list.length? list.map(b=>`
+    <tr>
+      <td>${fmtDate(b.fecha)}</td>
+      <td>${esc(b.deporte)}</td>
+      <td>${esc(b.evento)}<br><span style="color:var(--muted);font-size:11px">${esc(b.seleccion)} · ${esc(b.mercado)}</span></td>
+      <td>${esc(b.mercado)}</td>
+      <td>${esc(b.casa)}</td>
+      <td class="mono">${fmtNum(b.cuota)}</td>
+      <td class="mono">${fmtMoney(b.stake)}</td>
+      <td><span class="badge badge-${b.estado}">${estadoLabel(b.estado)}</span></td>
+      <td class="mono ${((b.gananciaNeta||0)>0)?'pos':((b.gananciaNeta||0)<0?'neg':'')}">${b.gananciaNeta===null?'—':fmtMoney(b.gananciaNeta)}</td>
+      <td class="mono">${b.retornoTotal===null?'—':fmtMoney(b.retornoTotal)}</td>
+      <td><div class="btn-row">
+        <button class="btn btn-sm" data-edit="${b.id}">Editar</button>
+        <button class="btn btn-sm" data-dup="${b.id}">Duplicar</button>
+        <button class="btn btn-sm btn-danger" data-del="${b.id}">Eliminar</button>
+      </div></td>
+    </tr>`).join('') : `<tr><td colspan="11"><div class="empty"><div class="big">🎫</div>No hay apuestas registradas con estos filtros.</div></td></tr>`}
+  </tbody></table></div>
+  <div style="margin-top:10px;color:var(--muted);font-size:12px;">${list.length} apuesta(s) · Total apostado: ${fmtMoney(list.filter(b=>b.estado!=='pendiente').reduce((s,b)=>s+Number(b.stake),0))}</div>
+  `;
+  el.querySelector('#fq').addEventListener('input',e=>{betFilters.q=e.target.value; renderApuestas(el);});
+  el.querySelector('#fdeporte').addEventListener('change',e=>{betFilters.deporte=e.target.value; renderApuestas(el);});
+  el.querySelector('#festado').addEventListener('change',e=>{betFilters.estado=e.target.value; renderApuestas(el);});
+  el.querySelector('#fcasa').addEventListener('change',e=>{betFilters.casa=e.target.value; renderApuestas(el);});
+  el.querySelector('#ffrom').addEventListener('change',e=>{betFilters.from=e.target.value; renderApuestas(el);});
+  el.querySelector('#fto').addEventListener('change',e=>{betFilters.to=e.target.value; renderApuestas(el);});
+  el.querySelector('#fclear').addEventListener('click',()=>{betFilters={q:'',deporte:'',estado:'',casa:'',from:'',to:''}; renderApuestas(el);});
+  el.querySelectorAll('th[data-col]').forEach(th=>th.addEventListener('click',()=>{
+    const c=th.dataset.col; if(betSort.col===c) betSort.dir*=-1; else {betSort.col=c; betSort.dir=1;}
+    renderApuestas(el);
+  }));
+  el.querySelectorAll('[data-edit]').forEach(b=>b.addEventListener('click',()=>openBetModal(b.dataset.edit)));
+  el.querySelectorAll('[data-dup]').forEach(b=>b.addEventListener('click',()=>duplicateBet(b.dataset.dup)));
+  el.querySelectorAll('[data-del]').forEach(b=>b.addEventListener('click',()=>deleteBet(b.dataset.del)));
+}
+function colLabel(c){ return {fecha:'Fecha',deporte:'Deporte',evento:'Evento',mercado:'Mercado',casa:'Casa',cuota:'Cuota',stake:'Stake',estado:'Estado',gananciaNeta:'G/P Neta',retornoTotal:'Retorno'}[c]||c; }
+function estadoLabel(s){ return {pendiente:'Pendiente',ganada:'Ganada',perdida:'Perdida',nula:'Nula',media_ganada:'Media ganada',media_perdida:'Media perdida',cash_out:'Cash out'}[s]||s; }
+
+function duplicateBet(id){
+  const b=DATA.bets.find(x=>x.id===id); if(!b) return;
+  const copy={...b, id:uid(), fecha:todayStr(), estado:'pendiente', gananciaNeta:null, retornoTotal:null, fechaResolucion:'', createdAt:new Date().toISOString(), editHistory:[]};
+  DATA.bets.push(copy); saveData(); render(); toast('Apuesta duplicada');
+}
+function deleteBet(id){
+  if(!confirm('¿Eliminar esta apuesta? Esta acción no se puede deshacer.')) return;
+  DATA.bets=DATA.bets.filter(b=>b.id!==id); saveData(); render(); toast('Apuesta eliminada');
+}
+
+function openBetModal(id){
+  const editing=id? DATA.bets.find(b=>b.id===id):null;
+  const b=editing || {id:uid(), fecha:todayStr(), hora:'20:00', deporte:DATA.config.deportes[0]||'', liga:'', evento:'', mercado:'', seleccion:'', casa:DATA.config.casas[0]||'', cuota:1.90, stake:Math.round(valorUnidadActual()), tipo:'simple', categoria:'moderado', estado:'pendiente', valorRecibido:'', fechaResolucion:'', tipster:'', etiquetas:'', comentarios:'', justificacion:'', riesgos:'', resultadoReal:'', evidencia:'', publicado:false, cuotaCierre:'', editHistory:[]};
+  const body=document.getElementById('modalBody');
+  body.innerHTML=`
+  <button class="modal-close" id="closeModal">✕</button>
+  <h2>${editing?'Editar apuesta':'Nueva apuesta'}</h2>
+  <form id="betForm">
+    <div class="grid grid-3">
+      <div class="field"><label>Fecha</label><input type="date" name="fecha" value="${b.fecha}" required></div>
+      <div class="field"><label>Hora</label><input type="time" name="hora" value="${b.hora||''}"></div>
+      <div class="field"><label>Deporte</label>${selectOrInput('deporte',DATA.config.deportes,b.deporte)}</div>
+      <div class="field"><label>Liga / Competición</label><input name="liga" value="${esc(b.liga)}"></div>
+      <div class="field"><label>Evento</label><input name="evento" value="${esc(b.evento)}" required></div>
+      <div class="field"><label>Mercado</label><input name="mercado" value="${esc(b.mercado)}" required></div>
+      <div class="field"><label>Selección</label><input name="seleccion" value="${esc(b.seleccion)}"></div>
+      <div class="field"><label>Casa de apuestas</label>${selectOrInput('casa',DATA.config.casas,b.casa)}</div>
+      <div class="field"><label>Cuota</label><input type="number" step="0.01" min="1.01" name="cuota" value="${b.cuota}" required></div>
+      <div class="field"><label>Stake (dinero)</label><input type="number" min="0" step="1000" name="stake" value="${b.stake}" required></div>
+      <div class="field"><label>Tipo</label><select name="tipo">${['simple','combinada','sistema','en_vivo','prepartido'].map(t=>`<option value="${t}" ${b.tipo===t?'selected':''}>${t.replace('_',' ')}</option>`).join('')}</select></div>
+      <div class="field"><label>Categoría del pronóstico</label><select name="categoria">${['conservador','moderado','agresivo'].map(t=>`<option value="${t}" ${b.categoria===t?'selected':''}>${t}</option>`).join('')}</select></div>
+      <div class="field"><label>Estado</label><select name="estado" id="estadoSel">${['pendiente','ganada','perdida','nula','media_ganada','media_perdida','cash_out'].map(s=>`<option value="${s}" ${b.estado===s?'selected':''}>${estadoLabel(s)}</option>`).join('')}</select></div>
+      <div class="field" id="valorRecibidoField" style="${b.estado==='cash_out'?'':'display:none'}"><label>Valor recibido (cash out)</label><input type="number" min="0" name="valorRecibido" value="${b.valorRecibido||''}"></div>
+      <div class="field"><label>Fecha de resolución</label><input type="date" name="fechaResolucion" value="${b.fechaResolucion||''}"></div>
+      <div class="field"><label>Tipster / analista</label><input name="tipster" value="${esc(b.tipster||'')}"></div>
+      <div class="field"><label>Cuota de cierre (CLV)</label><input type="number" step="0.01" name="cuotaCierre" value="${b.cuotaCierre||''}"></div>
+      <div class="field"><label>Etiquetas</label><input name="etiquetas" value="${esc(b.etiquetas||'')}" placeholder="separadas por coma"></div>
+      <div class="field"><label>¿Publicada?</label><select name="publicado"><option value="false" ${!b.publicado?'selected':''}>Privada</option><option value="true" ${b.publicado?'selected':''}>Publicada</option></select></div>
+      <div class="field"><label>Evidencia / enlace</label><input name="evidencia" value="${esc(b.evidencia||'')}"></div>
+    </div>
+    <div class="field"><label>Justificación del pick</label><textarea name="justificacion" rows="2">${esc(b.justificacion||'')}</textarea></div>
+    <div class="field"><label>Riesgos identificados</label><textarea name="riesgos" rows="2">${esc(b.riesgos||'')}</textarea></div>
+    <div class="field"><label>Comentarios</label><textarea name="comentarios" rows="2">${esc(b.comentarios||'')}</textarea></div>
+    <div id="calcPreview" style="margin:10px 0; font-size:12.5px; color:var(--muted);"></div>
+    <div class="btn-row"><button type="submit" class="btn btn-gold">Guardar apuesta</button><button type="button" class="btn" id="cancelBet">Cancelar</button></div>
+  </form>`;
+  document.getElementById('overlay').classList.add('active');
+  document.getElementById('closeModal').onclick=closeModal;
+  document.getElementById('cancelBet').onclick=closeModal;
+  const form=document.getElementById('betForm');
+  form.querySelector('[name="estado"]').addEventListener('change',e=>{
+    document.getElementById('valorRecibidoField').style.display=e.target.value==='cash_out'?'':'none';
+    updatePreview();
+  });
+  ['cuota','stake','estado'].forEach(n=>form.querySelector(`[name="${n}"]`)?.addEventListener('input',updatePreview));
+  form.querySelector('[name="valorRecibido"]')?.addEventListener('input',updatePreview);
+  function updatePreview(){
+    const fd=new FormData(form); const tmp={estado:fd.get('estado'), stake:Number(fd.get('stake')||0), cuota:Number(fd.get('cuota')||0), valorRecibido:Number(fd.get('valorRecibido')||0)};
+    const c=calcularApuesta(tmp);
+    document.getElementById('calcPreview').innerHTML = c.ganancia===null? 'Capital comprometido: <b>'+fmtMoney(tmp.stake)+'</b> (no afecta el bankroll hasta resolverse)'
+      : `Ganancia/pérdida neta estimada: <b class="${c.ganancia>=0?'pos':'neg'}">${fmtMoney(c.ganancia)}</b> · Retorno total: <b>${fmtMoney(c.retorno)}</b>`;
+  }
+  updatePreview();
+  form.addEventListener('submit',e=>{
+    e.preventDefault();
+    const fd=new FormData(form);
+    if(Number(fd.get('cuota'))<1.01){ toast('⚠️ La cuota no puede ser inferior a 1.01'); return; }
+    if(Number(fd.get('stake'))<0){ toast('⚠️ El stake no puede ser negativo'); return; }
+    const nb={...b};
+    for(const [k,v] of fd.entries()){ nb[k]=v; }
+    nb.cuota=Number(nb.cuota); nb.stake=Number(nb.stake); nb.publicado=(nb.publicado==='true');
+    nb.valorRecibido = nb.valorRecibido? Number(nb.valorRecibido): null;
+    nb.cuotaCierre = nb.cuotaCierre? Number(nb.cuotaCierre): null;
+    if(nb.estado!=='pendiente' && !nb.fechaResolucion) nb.fechaResolucion=nb.fecha;
+    const calc=calcularApuesta(nb); nb.gananciaNeta=calc.ganancia; nb.retornoTotal=calc.retorno;
+    if(editing){
+      nb.editHistory=[...(editing.editHistory||[]), {ts:new Date().toISOString(), prev:{estado:editing.estado,stake:editing.stake,cuota:editing.cuota}}];
+      nb.updatedAt=new Date().toISOString();
+      const idx=DATA.bets.findIndex(x=>x.id===id); DATA.bets[idx]=nb;
+    } else {
+      nb.createdAt=new Date().toISOString();
+      DATA.bets.push(nb);
+    }
+    saveData(); closeModal(); render(); toast(editing?'Apuesta actualizada':'Apuesta registrada');
+  });
+}
+function selectOrInput(name,list,val){
+  return `<select name="${name}">${list.map(o=>`<option ${o===val?'selected':''}>${esc(o)}</option>`).join('')}${val&&!list.includes(val)?`<option selected>${esc(val)}</option>`:''}</select>`;
+}
+function closeModal(){ document.getElementById('overlay').classList.remove('active'); }
+
+/* ============================= BANKROLL ============================= */
+function renderBankroll(el){
+  const mm=bankrollMaxMin(); const dd=maxDrawdown();
+  el.innerHTML=`
+  <div class="grid grid-4">
+    ${kpi('Bankroll inicial',fmtMoney(DATA.config.bankrollInicial))}
+    ${kpi('Bankroll actual',fmtMoney(bankrollActual()), bankrollActual()>=DATA.config.bankrollInicial?'pos':'neg')}
+    ${kpi('Máximo histórico',fmtMoney(mm.max),'pos')}
+    ${kpi('Mínimo histórico',fmtMoney(mm.min),'neg')}
+    ${kpi('Ganancia/pérdida acumulada',fmtMoney(gananciaNetaTotal()), gananciaNetaTotal()>=0?'pos':'neg')}
+    ${kpi('Rentabilidad acumulada',fmtPct(rentabilidadInicial()))}
+    ${kpi('Total apostado',fmtMoney(totalApostado()))}
+    ${kpi('Total ganado / perdido',fmtMoney(totalGanado())+' / '+fmtMoney(totalPerdido()))}
+    ${kpi('Valor actual de 1 unidad',fmtMoney(valorUnidadActual()))}
+    ${kpi('Capital pendiente al objetivo',fmtMoney(Math.max(0,(Number(DATA.config.bankrollObjetivo)||0)-bankrollActual())))}
+    ${kpi('Drawdown máximo',fmtPct(-dd.maxDDpct)+' · '+fmtMoney(-dd.maxDD),'neg')}
+    ${kpi('Recuperación necesaria',dd.maxDD>0? fmtPct((dd.maxDD/(bankrollActual()||1))*100)+' desde el mínimo':'—')}
+  </div>
+  <div class="section-title">Evolución del bankroll</div>
+  <div class="tag-row filters" id="rangeTags">
+    ${[['7','7 días'],['30','30 días'],['90','3 meses'],['180','6 meses'],['year','Año actual'],['all','Todo']].map(([v,l])=>`<span class="tag ${v==='all'?'active':''}" data-r="${v}">${l}</span>`).join('')}
+  </div>
+  <div class="card"><div class="chart-box"><canvas id="chartBk2"></canvas></div></div>
+
+  <div class="section-title">Movimientos de capital (depósitos, retiros, bonos)</div>
+  <div class="btn-row" style="margin-bottom:10px;"><button class="btn btn-gold" id="addMov">+ Registrar movimiento</button></div>
+  <div class="table-wrap"><table><thead><tr><th>Fecha</th><th>Tipo</th><th>Monto</th><th>Nota</th><th>Acciones</th></tr></thead><tbody>
+  ${DATA.movements.length? [...DATA.movements].sort((a,b)=>b.fecha.localeCompare(a.fecha)).map(m=>`
+    <tr><td>${fmtDate(m.fecha)}</td><td>${movTipoLabel(m.tipo)}</td><td class="mono ${m.tipo==='retiro'?'neg':'pos'}">${m.tipo==='retiro'?'-':'+'}${fmtMoney(m.monto)}</td><td>${esc(m.nota||'')}</td>
+    <td><button class="btn btn-sm btn-danger" data-delmov="${m.id}">Eliminar</button></td></tr>`).join('') : `<tr><td colspan="5"><div class="empty">Sin movimientos registrados aún.</div></td></tr>`}
+  </tbody></table></div>`;
+  drawBankrollChart('chartBk2','all');
+  el.querySelectorAll('#rangeTags .tag').forEach(t=>t.addEventListener('click',()=>{
+    el.querySelectorAll('#rangeTags .tag').forEach(x=>x.classList.remove('active')); t.classList.add('active');
+    drawBankrollChart('chartBk2',t.dataset.r);
+  }));
+  el.querySelector('#addMov').addEventListener('click',openMovModal);
+  el.querySelectorAll('[data-delmov]').forEach(b=>b.addEventListener('click',()=>{
+    DATA.movements=DATA.movements.filter(m=>m.id!==b.dataset.delmov); saveData(); render();
+  }));
+}
+function movTipoLabel(t){ return {deposito:'Depósito',retiro:'Retiro',bonificacion:'Bonificación',correccion:'Corrección manual',otro:'Otro'}[t]||t; }
+function kpi(l,v,cls=''){ return `<div class="kpi"><div class="lbl">${l}</div><div class="val ${cls}">${v}</div></div>`; }
+function openMovModal(){
+  const body=document.getElementById('modalBody');
+  body.innerHTML=`<button class="modal-close" id="closeModal">✕</button><h2>Registrar movimiento</h2>
+  <form id="movForm">
+    <div class="field"><label>Fecha</label><input type="date" name="fecha" value="${todayStr()}" required></div>
+    <div class="field"><label>Tipo</label><select name="tipo">${['deposito','retiro','bonificacion','correccion','otro'].map(t=>`<option value="${t}">${movTipoLabel(t)}</option>`).join('')}</select></div>
+    <div class="field"><label>Monto</label><input type="number" min="0" name="monto" required></div>
+    <div class="field"><label>Nota</label><input name="nota"></div>
+    <div class="btn-row"><button class="btn btn-gold" type="submit">Guardar</button><button class="btn" type="button" id="cancelMov">Cancelar</button></div>
+  </form>`;
+  document.getElementById('overlay').classList.add('active');
+  document.getElementById('closeModal').onclick=closeModal;
+  document.getElementById('cancelMov').onclick=closeModal;
+  document.getElementById('movForm').addEventListener('submit',e=>{
+    e.preventDefault(); const fd=new FormData(e.target);
+    DATA.movements.push({id:uid(), fecha:fd.get('fecha'), tipo:fd.get('tipo'), monto:Number(fd.get('monto')), nota:fd.get('nota')});
+    saveData(); closeModal(); render(); toast('Movimiento registrado');
+  });
+}
+
+/* ============================= CALENDARIO ============================= */
+let calMonth=new Date().getMonth(), calYear=new Date().getFullYear();
+function renderCalendario(el){
+  const first=new Date(calYear,calMonth,1);
+  const startDow=first.getDay();
+  const daysInM=new Date(calYear,calMonth+1,0).getDate();
+  const byDay={};
+  DATA.bets.forEach(b=>{
+    const d=b.fecha; if(!byDay[d]) byDay[d]={n:0,gp:0,pend:false};
+    byDay[d].n++; byDay[d].gp+=(b.gananciaNeta||0); if(b.estado==='pendiente') byDay[d].pend=true;
+  });
+  el.innerHTML=`
+  <div class="btn-row" style="margin-bottom:14px;align-items:center;">
+    <button class="btn btn-sm" id="prevM">‹</button>
+    <div style="font-weight:700;min-width:160px;text-align:center;">${first.toLocaleDateString('es-CO',{month:'long',year:'numeric'})}</div>
+    <button class="btn btn-sm" id="nextM">›</button>
+  </div>
+  <div class="calendar">
+    ${['D','L','M','X','J','V','S'].map(d=>`<div style="text-align:center;color:var(--muted);font-size:11px;font-weight:700;">${d}</div>`).join('')}
+    ${Array(startDow).fill(0).map(()=>`<div class="cal-cell empty-c"></div>`).join('')}
+    ${Array(daysInM).fill(0).map((_,i)=>{
+      const dnum=i+1; const dstr=`${calYear}-${String(calMonth+1).padStart(2,'0')}-${String(dnum).padStart(2,'0')}`;
+      const info=byDay[dstr]; let cls='';
+      if(info){ cls=info.pend?'pend-day':(info.gp>0?'pos-day':(info.gp<0?'neg-day':'')); }
+      return `<div class="cal-cell ${cls}" data-day="${dstr}"><div class="d">${dnum}</div>${info?`<div style="font-size:10px;">${info.n} ap.<br><span class="mono">${fmtMoney(info.gp)}</span></div>`:''}</div>`;
+    }).join('')}
+  </div>
+  <div id="dayDetail" style="margin-top:16px;"></div>`;
+  el.querySelector('#prevM').addEventListener('click',()=>{ calMonth--; if(calMonth<0){calMonth=11;calYear--;} renderCalendario(el); });
+  el.querySelector('#nextM').addEventListener('click',()=>{ calMonth++; if(calMonth>11){calMonth=0;calYear++;} renderCalendario(el); });
+  el.querySelectorAll('[data-day]').forEach(c=>c.addEventListener('click',()=>{
+    const d=c.dataset.day; const bets=DATA.bets.filter(b=>b.fecha===d);
+    const det=el.querySelector('#dayDetail');
+    det.innerHTML=`<div class="section-title">Apuestas del ${fmtDate(d)}</div>` + (bets.length? `<div class="table-wrap"><table><thead><tr><th>Evento</th><th>Mercado</th><th>Cuota</th><th>Stake</th><th>Estado</th><th>G/P</th></tr></thead><tbody>
+    ${bets.map(b=>`<tr><td>${esc(b.evento)}</td><td>${esc(b.mercado)}</td><td class="mono">${fmtNum(b.cuota)}</td><td class="mono">${fmtMoney(b.stake)}</td><td><span class="badge badge-${b.estado}">${estadoLabel(b.estado)}</span></td><td class="mono ${(b.gananciaNeta||0)>=0?'pos':'neg'}">${b.gananciaNeta===null?'—':fmtMoney(b.gananciaNeta)}</td></tr>`).join('')}
+    </tbody></table></div>` : `<div class="empty">Sin apuestas ese día.</div>`);
+  }));
+}
+
+/* ============================= ANALISIS ============================= */
+function groupBy(keyFn){
+  const groups={};
+  apuestasResueltas().forEach(b=>{
+    const k=keyFn(b); if(!groups[k]) groups[k]={n:0,g:0,f:0,apostado:0,gp:0,cuotas:0};
+    groups[k].n++; groups[k].apostado+=Number(b.stake); groups[k].gp+=(b.gananciaNeta||0); groups[k].cuotas+=Number(b.cuota);
+    if(b.estado!=='nula'){ if((b.gananciaNeta||0)>0) groups[k].g++; else if((b.gananciaNeta||0)<0) groups[k].f++; }
+  });
+  return groups;
+}
+function analysisTable(title,groups){
+  const rows=Object.entries(groups).sort((a,b)=>b[1].gp-a[1].gp);
+  const totalStake=rows.reduce((s,r)=>s+r[1].apostado,0)||1;
+  return `<div class="section-title">${title}</div>
+  <div class="table-wrap"><table><thead><tr><th>Categoría</th><th>Apuestas</th><th>Aciertos</th><th>Fallos</th><th>% Acierto</th><th>Apostado</th><th>G/P</th><th>ROI</th><th>Cuota prom.</th></tr></thead><tbody>
+  ${rows.length? rows.map(([k,v])=>{
+    const resueltasNoNulas=v.g+v.f; const pa=resueltasNoNulas? v.g/resueltasNoNulas*100:0; const roiC=v.apostado? v.gp/v.apostado*100:0;
+    const sample=v.n<10? ` <span class="tooltip-i" title="Muestra pequeña (${v.n} apuestas). No saques conclusiones definitivas todavía.">i</span>`:'';
+    return `<tr><td>${esc(k)}${sample}</td><td>${v.n}</td><td class="pos">${v.g}</td><td class="neg">${v.f}</td><td>${fmtNum(pa,1)}%</td><td class="mono">${fmtMoney(v.apostado)}</td><td class="mono ${v.gp>=0?'pos':'neg'}">${fmtMoney(v.gp)}</td><td class="${roiC>=0?'pos':'neg'}">${fmtPct(roiC)}</td><td class="mono">${fmtNum(v.cuotas/v.n)}</td></tr>`;
+  }).join('') : `<tr><td colspan="9"><div class="empty">Sin datos suficientes.</div></td></tr>`}
+  </tbody></table></div>`;
+}
+function cuotaRangeLabel(c){
+  if(c<1.5) return '1.01–1.49'; if(c<1.8) return '1.50–1.79'; if(c<2.0) return '1.80–1.99';
+  if(c<2.5) return '2.00–2.49'; if(c<3.0) return '2.50–2.99'; return '3.00+';
+}
+function renderAnalisis(el){
+  const byDeporte=groupBy(b=>b.deporte);
+  const byMercado=groupBy(b=>b.mercado);
+  const byCasa=groupBy(b=>b.casa);
+  const byCuota=groupBy(b=>cuotaRangeLabel(Number(b.cuota)));
+  const byTipo=groupBy(b=>b.tipo);
+  const byDia=groupBy(b=>new Date(b.fecha+'T00:00:00').toLocaleDateString('es-CO',{weekday:'long'}));
+  const byLiga=groupBy(b=>b.liga||'Sin especificar');
+
+  // Detección automática
+  const insights=[];
+  const bestSport=Object.entries(byDeporte).sort((a,b)=>b[1].gp-a[1].gp)[0];
+  if(bestSport) insights.push(`📈 El deporte con mejor rendimiento es <b>${esc(bestSport[0])}</b> (${fmtMoney(bestSport[1].gp)}).`);
+  const worstMarket=Object.entries(byMercado).sort((a,b)=>a[1].gp-b[1].gp)[0];
+  if(worstMarket && worstMarket[1].gp<0) insights.push(`📉 El mercado <b>${esc(worstMarket[0])}</b> muestra pérdidas recurrentes (${fmtMoney(worstMarket[1].gp)}).`);
+  const bestOddRange=Object.entries(byCuota).sort((a,b)=>b[1].gp-a[1].gp)[0];
+  if(bestOddRange) insights.push(`🎯 El rango de cuotas <b>${bestOddRange[0]}</b> presenta el mejor resultado acumulado.`);
+  const maxStake=Math.max(0,...DATA.bets.map(b=>Number(b.stake)||0));
+  const avgStake=totalApostado()/(apuestasResueltas().length||1);
+  if(maxStake>avgStake*3) insights.push(`⚠️ Se detectó al menos un stake muy superior al promedio (${fmtMoney(maxStake)} vs. promedio ${fmtMoney(avgStake)}). Revisa si fue una desviación de tu plan de gestión.`);
+  const top3Share=(()=>{ const sorted=[...apuestasResueltas()].sort((a,b)=>(b.gananciaNeta||0)-(a.gananciaNeta||0)).slice(0,3); const s=sorted.reduce((s,b)=>s+Math.max(0,b.gananciaNeta||0),0); return totalGanado()? s/totalGanado()*100:0; })();
+  if(top3Share>50) insights.push(`⚠️ El ${fmtNum(top3Share,0)}% de tus ganancias proviene de solo 3 apuestas. Hay dependencia de pocos resultados ganadores.`);
+
+  el.innerHTML=`
+  <div class="section-title">Detección automática</div>
+  ${insights.length? insights.map(i=>`<div class="alert alert-info">${i}</div>`).join('') : `<div class="empty">Registra más apuestas para obtener detección automática de patrones.</div>`}
+  ${analysisTable('Por deporte',byDeporte)}
+  ${analysisTable('Por mercado',byMercado)}
+  ${analysisTable('Por liga / competición',byLiga)}
+  ${analysisTable('Por casa de apuestas',byCasa)}
+  ${analysisTable('Por rango de cuota',byCuota)}
+  ${analysisTable('Por tipo de apuesta',byTipo)}
+  ${analysisTable('Por día de la semana',byDia)}
+  `;
+}
+
+/* ============================= RIESGO ============================= */
+function renderRiesgo(el){
+  const c=DATA.config; const ba=bankrollActual();
+  const pendientes=DATA.bets.filter(b=>b.estado==='pendiente');
+  const today=todayStr();
+  const perdidaHoy=DATA.bets.filter(b=>(b.fechaResolucion||b.fecha)===today && b.estado!=='pendiente').reduce((s,b)=>s+Math.min(0,b.gananciaNeta||0),0);
+  const weekAgo=new Date(Date.now()-7*86400000).toISOString().slice(0,10);
+  const perdidaSemana=DATA.bets.filter(b=>(b.fechaResolucion||b.fecha)>=weekAgo && b.estado!=='pendiente').reduce((s,b)=>s+Math.min(0,b.gananciaNeta||0),0);
+  const dd=maxDrawdown();
+  const rachaP=rachaActualPerdidas();
+  const eventCounts={}; pendientes.forEach(b=>{ eventCounts[b.evento]=(eventCounts[b.evento]||0)+1; });
+  const concentrado=Object.entries(eventCounts).filter(([k,v])=>v>1);
+
+  const alerts=[];
+  const lastBig=DATA.bets.filter(b=>Number(b.stake)/ba*100>Number(c.limiteApuestaPct)).slice(-1)[0];
+  if(lastBig) alerts.push(['danger',`Se registró una apuesta que supera el límite máximo configurado por apuesta (${c.limiteApuestaPct}% del bankroll).`]);
+  if(Math.abs(perdidaHoy)/ba*100 >= Number(c.limitePerdidaDiariaPct)) alerts.push(['danger',`Se alcanzó el límite de pérdida diaria configurado (${c.limitePerdidaDiariaPct}%).`]);
+  if(Math.abs(perdidaSemana)/ba*100 >= Number(c.limitePerdidaSemanalPct)) alerts.push(['danger',`Se alcanzó el límite de pérdida semanal configurado (${c.limitePerdidaSemanalPct}%).`]);
+  if(dd.maxDDpct >= Number(c.drawdownAlertaPct)) alerts.push(['warn',`El drawdown actual (${fmtNum(dd.maxDDpct,1)}%) supera el nivel configurado de alerta (${c.drawdownAlertaPct}%).`]);
+  if(rachaP >= Number(c.rachaPerdidasAlerta)) alerts.push(['warn',`Racha de ${rachaP} pérdidas consecutivas. Considera pausar y revisar tu proceso antes de seguir apostando.`]);
+  if(concentrado.length) alerts.push(['warn',`Hay ${concentrado.length} evento(s) con más de una apuesta pendiente relacionada: ${concentrado.map(c=>esc(c[0])).join(', ')}.`]);
+  if(rachaP>=2) alerts.push(['info','Mensaje preventivo: evita perseguir pérdidas aumentando el stake por impulso. Respeta tu plan de gestión incluso después de una racha negativa (tilt).']);
+
+  el.innerHTML=`
+  <div class="grid grid-4">
+    ${kpi('Capital expuesto (pendientes)',fmtMoney(bankrollComprometido()))}
+    ${kpi('% arriesgado hoy',fmtNum(Math.abs(perdidaHoy)/ba*100,1)+'%')}
+    ${kpi('% arriesgado esta semana',fmtNum(Math.abs(perdidaSemana)/ba*100,1)+'%')}
+    ${kpi('Apuestas pendientes simultáneas',pendientes.length)}
+    ${kpi('Stake máximo histórico',fmtMoney(Math.max(0,...DATA.bets.map(b=>Number(b.stake)||0))))}
+    ${kpi('Racha de pérdidas actual',rachaP)}
+    ${kpi('Drawdown actual',fmtPct(-dd.maxDDpct))}
+    ${kpi('Riesgo concentrado (eventos)',concentrado.length)}
+  </div>
+  <div class="section-title">Límites configurados</div>
+  <div class="card grid grid-3">
+    <div>Máximo por apuesta<div class="risk-bar"><div class="risk-bar-fill" style="width:${Math.min(100,c.limiteApuestaPct*4)}%;background:var(--gold);"></div></div><div style="margin-top:4px;" class="mono">${c.limiteApuestaPct}% del bankroll</div></div>
+    <div>Pérdida diaria máxima<div class="risk-bar"><div class="risk-bar-fill" style="width:${Math.min(100,Math.abs(perdidaHoy)/ba*100/c.limitePerdidaDiariaPct*100)}%;background:var(--warn);"></div></div><div style="margin-top:4px;" class="mono">${c.limitePerdidaDiariaPct}% del bankroll</div></div>
+    <div>Pérdida semanal máxima<div class="risk-bar"><div class="risk-bar-fill" style="width:${Math.min(100,Math.abs(perdidaSemana)/ba*100/c.limitePerdidaSemanalPct*100)}%;background:var(--neg);"></div></div><div style="margin-top:4px;" class="mono">${c.limitePerdidaSemanalPct}% del bankroll</div></div>
+  </div>
+  <div class="section-title">Alertas activas</div>
+  ${alerts.length? alerts.map(a=>`<div class="alert alert-${a[0]}">${a[1]}</div>`).join('') : `<div class="alert alert-info">No hay alertas activas por el momento. Tu operación está dentro de los límites configurados.</div>`}
+  `;
+}
+
+/* ============================= PICKS PUBLICADOS ============================= */
+function renderPicks(el){
+  const pubs=DATA.bets.filter(b=>b.publicado);
+  const gratis=pubs, premium=[]; // simplificado: todo lo publicado se trata como "picks" con posibilidad de marcar premium via etiqueta
+  const gp=pubs.filter(b=>b.estado!=='pendiente').reduce((s,b)=>s+(b.gananciaNeta||0),0);
+  const gpAll=gananciaNetaTotal();
+  el.innerHTML=`
+  <div class="grid grid-3">
+    ${kpi('Picks publicados',pubs.length)}
+    ${kpi('G/P de picks publicados',fmtMoney(gp), gp>=0?'pos':'neg')}
+    ${kpi('G/P bankroll personal (total)',fmtMoney(gpAll), gpAll>=0?'pos':'neg')}
+  </div>
+  <div style="margin:10px 0;color:var(--muted);font-size:12px;">Los picks publicados se marcan desde el formulario de cada apuesta (campo "¿Publicada?"). Aquí se muestra su rendimiento por separado del bankroll personal, útil para reportes públicos a seguidores.</div>
+  <div class="table-wrap"><table><thead><tr><th>Fecha</th><th>Evento</th><th>Mercado</th><th>Cuota</th><th>Cuota cierre</th><th>CLV</th><th>Stake</th><th>Estado</th><th>G/P</th></tr></thead><tbody>
+  ${pubs.length? pubs.map(b=>{
+    const clv=(b.cuotaCierre&&b.cuota)? ((b.cuota/b.cuotaCierre-1)*100):null;
+    return `<tr><td>${fmtDate(b.fecha)}</td><td>${esc(b.evento)}</td><td>${esc(b.mercado)}</td><td class="mono">${fmtNum(b.cuota)}</td><td class="mono">${b.cuotaCierre?fmtNum(b.cuotaCierre):'—'}</td><td class="mono ${clv>0?'pos':(clv<0?'neg':'')}">${clv===null?'—':fmtPct(clv)}</td><td class="mono">${fmtMoney(b.stake)}</td><td><span class="badge badge-${b.estado}">${estadoLabel(b.estado)}</span></td><td class="mono ${(b.gananciaNeta||0)>=0?'pos':'neg'}">${b.gananciaNeta===null?'—':fmtMoney(b.gananciaNeta)}</td></tr>`;
+  }).join('') : `<tr><td colspan="9"><div class="empty">Aún no marcas apuestas como publicadas.</div></td></tr>`}
+  </tbody></table></div>
+  <div style="margin-top:8px;font-size:11.5px;color:var(--muted);">CLV = (cuota tomada ÷ cuota de cierre − 1) × 100. Un CLV positivo indica que tomaste una cuota mejor que la del cierre del mercado.</div>
+  `;
+}
+
+/* ============================= DIARIO ============================= */
+function renderDiario(el){
+  el.innerHTML=`<div class="btn-row" style="margin-bottom:12px;"><button class="btn btn-gold" id="addDiary">+ Nueva entrada</button></div>
+  <div id="diaryList"></div>`;
+  el.querySelector('#addDiary').addEventListener('click',openDiaryModal);
+  const list=el.querySelector('#diaryList');
+  const entries=[...DATA.diary].sort((a,b)=>b.fecha.localeCompare(a.fecha));
+  list.innerHTML=entries.length? entries.map(d=>`
+    <div class="card" style="margin-bottom:10px;">
+      <div style="display:flex;justify-content:space-between;">
+        <b>${fmtDate(d.fecha)}</b>
+        <div class="btn-row"><button class="btn btn-sm" data-editd="${d.id}">Editar</button><button class="btn btn-sm btn-danger" data-deld="${d.id}">Eliminar</button></div>
+      </div>
+      <div style="margin-top:6px;color:var(--muted);font-size:12px;">Estado emocional: <b class="gold-c">${esc(d.estadoEmocional)}</b> · Confianza: <b>${esc(d.confianza)}/10</b></div>
+      ${d.objetivo?`<div style="margin-top:6px;"><b>Objetivo:</b> ${esc(d.objetivo)}</div>`:''}
+      ${d.analisisPrevio?`<div><b>Análisis previo:</b> ${esc(d.analisisPrevio)}</div>`:''}
+      ${d.errores?`<div><b>Errores:</b> ${esc(d.errores)}</div>`:''}
+      ${d.aprendizajes?`<div><b>Aprendizajes:</b> ${esc(d.aprendizajes)}</div>`:''}
+      ${d.cambios?`<div><b>Cambios a implementar:</b> ${esc(d.cambios)}</div>`:''}
+      ${d.comentarios?`<div><b>Comentarios:</b> ${esc(d.comentarios)}</div>`:''}
+    </div>`).join('') : `<div class="empty">Aún no tienes entradas en el diario.</div>`;
+  list.querySelectorAll('[data-editd]').forEach(b=>b.addEventListener('click',()=>openDiaryModal(b.dataset.editd)));
+  list.querySelectorAll('[data-deld]').forEach(b=>b.addEventListener('click',()=>{ DATA.diary=DATA.diary.filter(d=>d.id!==b.dataset.deld); saveData(); render(); }));
+}
+function openDiaryModal(id){
+  const editing=id? DATA.diary.find(d=>d.id===id):null;
+  const d=editing||{id:uid(),fecha:todayStr(),estadoEmocional:'Tranquilo',confianza:7,objetivo:'',analisisPrevio:'',errores:'',aprendizajes:'',cambios:'',comentarios:''};
+  const body=document.getElementById('modalBody');
+  body.innerHTML=`<button class="modal-close" id="closeModal">✕</button><h2>${editing?'Editar entrada':'Nueva entrada del diario'}</h2>
+  <form id="diaryForm">
+    <div class="grid grid-2">
+      <div class="field"><label>Fecha</label><input type="date" name="fecha" value="${d.fecha}" required></div>
+      <div class="field"><label>Estado emocional</label><input name="estadoEmocional" value="${esc(d.estadoEmocional)}"></div>
+      <div class="field"><label>Nivel de confianza (1-10)</label><input type="number" min="1" max="10" name="confianza" value="${d.confianza}"></div>
+      <div class="field"><label>Objetivo del día</label><input name="objetivo" value="${esc(d.objetivo)}"></div>
+    </div>
+    <div class="field"><label>Análisis previo</label><textarea name="analisisPrevio" rows="2">${esc(d.analisisPrevio)}</textarea></div>
+    <div class="field"><label>Errores cometidos</label><textarea name="errores" rows="2">${esc(d.errores)}</textarea></div>
+    <div class="field"><label>Aprendizajes</label><textarea name="aprendizajes" rows="2">${esc(d.aprendizajes)}</textarea></div>
+    <div class="field"><label>Cambios a implementar</label><textarea name="cambios" rows="2">${esc(d.cambios)}</textarea></div>
+    <div class="field"><label>Comentarios posteriores a resultados</label><textarea name="comentarios" rows="2">${esc(d.comentarios)}</textarea></div>
+    <div class="btn-row"><button class="btn btn-gold" type="submit">Guardar</button><button class="btn" type="button" id="cancelD">Cancelar</button></div>
+  </form>`;
+  document.getElementById('overlay').classList.add('active');
+  document.getElementById('closeModal').onclick=closeModal;
+  document.getElementById('cancelD').onclick=closeModal;
+  document.getElementById('diaryForm').addEventListener('submit',e=>{
+    e.preventDefault(); const fd=new FormData(e.target); const nd={...d};
+    for(const [k,v] of fd.entries()) nd[k]=v;
+    if(editing){ const idx=DATA.diary.findIndex(x=>x.id===id); DATA.diary[idx]=nd; } else DATA.diary.push(nd);
+    saveData(); closeModal(); render(); toast('Entrada guardada');
+  });
+}
+
+/* ============================= REPORTES ============================= */
+function renderReportes(el){
+  el.innerHTML=`
+  <div class="card">
+    <div class="grid grid-3">
+      <div class="field"><label>Tipo de período</label><select id="repType">
+        <option value="7">Última semana</option><option value="30" selected>Último mes</option><option value="90">Último trimestre</option><option value="365">Último año</option><option value="custom">Rango personalizado</option>
+      </select></div>
+      <div class="field" id="repFromWrap" style="display:none"><label>Desde</label><input type="date" id="repFrom"></div>
+      <div class="field" id="repToWrap" style="display:none"><label>Hasta</label><input type="date" id="repTo"></div>
+    </div>
+    <div class="btn-row">
+      <button class="btn btn-gold" id="genRep">Generar reporte</button>
+      <button class="btn" id="expCSV">Exportar apuestas CSV</button>
+      <button class="btn" id="expMovCSV">Exportar movimientos CSV</button>
+      <button class="btn" id="expPublic">Copiar resumen público (sin bankroll)</button>
+    </div>
+  </div>
+  <div id="repOutput" style="margin-top:16px;"></div>`;
+  const typeSel=el.querySelector('#repType');
+  typeSel.addEventListener('change',()=>{
+    const custom=typeSel.value==='custom';
+    el.querySelector('#repFromWrap').style.display=custom?'':'none';
+    el.querySelector('#repToWrap').style.display=custom?'':'none';
+  });
+  el.querySelector('#genRep').addEventListener('click',()=>generateReport(el));
+  el.querySelector('#expCSV').addEventListener('click',exportBetsCSV);
+  el.querySelector('#expMovCSV').addEventListener('click',exportMovementsCSV);
+  el.querySelector('#expPublic').addEventListener('click',()=>generateReport(el,true));
+}
+function repRangeDates(el){
+  const t=el.querySelector('#repType').value;
+  if(t==='custom') return {from:el.querySelector('#repFrom').value||'0000-00-00', to:el.querySelector('#repTo').value||todayStr()};
+  const d=new Date(Date.now()-Number(t)*86400000);
+  return {from:d.toISOString().slice(0,10), to:todayStr()};
+}
+function generateReport(el,publicMode=false){
+  const {from,to}=repRangeDates(el);
+  const bets=DATA.bets.filter(b=>b.fecha>=from && b.fecha<=to);
+  const resueltas=bets.filter(b=>b.estado!=='pendiente');
+  const apostado=resueltas.reduce((s,b)=>s+Number(b.stake),0);
+  const gp=resueltas.reduce((s,b)=>s+(b.gananciaNeta||0),0);
+  const roiP=apostado? gp/apostado*100:0;
+  const vu=valorUnidadActual();
+  const yieldP=apostado? (gp/vu)/(apostado/vu)*100:0;
+  const noNulas=resueltas.filter(b=>b.estado!=='nula');
+  const ganadas=noNulas.filter(b=>(b.gananciaNeta||0)>0);
+  const acierto=noNulas.length? ganadas.length/noNulas.length*100:0;
+  const mejor=resueltas.length? resueltas.reduce((a,b)=>(b.gananciaNeta||0)>(a.gananciaNeta||0)?b:a):null;
+  const peor=resueltas.length? resueltas.reduce((a,b)=>(b.gananciaNeta||0)<(a.gananciaNeta||0)?b:a):null;
+  const bmDep=Object.entries(groupBy(b=>b.deporte)).filter(([k])=>bets.some(b=>b.deporte===k));
+  const bestDep=bmDep.sort((a,b)=>b[1].gp-a[1].gp)[0];
+  const worstDep=bmDep.sort((a,b)=>a[1].gp-b[1].gp)[0];
+  const conclusiones=[];
+  conclusiones.push(gp>=0? 'El período analizado cerró en positivo, manteniendo la estrategia dentro del plan de gestión de bankroll.' : 'El período analizado cerró en negativo; se recomienda revisar el diario y las categorías con peor rendimiento antes de aumentar el stake.');
+  if(acierto<45) conclusiones.push('El porcentaje de acierto está por debajo del 45%, conviene revisar la selección de mercados y cuotas.');
+  if(resueltas.length<15) conclusiones.push('La muestra de este período es reducida; las conclusiones deben tomarse con cautela.');
+
+  const html=`
+  <div class="card">
+    <h3>Reporte ${publicMode?'público':'interno'} · ${fmtDate(from)} — ${fmtDate(to)}</h3>
+    <div class="grid grid-4" style="margin-top:12px;">
+      ${!publicMode?kpi('Bankroll inicial del período',fmtMoney(DATA.config.bankrollInicial)):''}
+      ${!publicMode?kpi('Bankroll final',fmtMoney(bankrollActual())):''}
+      ${kpi('Total apostado',fmtMoney(apostado))}
+      ${kpi('Ganancia/pérdida neta',fmtMoney(gp),gp>=0?'pos':'neg')}
+      ${kpi('ROI',fmtPct(roiP))}
+      ${kpi('Yield',fmtPct(yieldP))}
+      ${kpi('% Acierto',fmtNum(acierto,1)+'%')}
+      ${kpi('Unidades G/P',fmtNum(gp/vu)+' u')}
+    </div>
+    <div class="section-title">Detalle</div>
+    <p>Mejor apuesta: ${mejor?esc(mejor.evento)+' ('+fmtMoney(mejor.gananciaNeta)+')':'—'}</p>
+    <p>Peor apuesta: ${peor?esc(peor.evento)+' ('+fmtMoney(peor.gananciaNeta)+')':'—'}</p>
+    <p>Mejor deporte: ${bestDep?esc(bestDep[0]):'—'} · Peor deporte: ${worstDep?esc(worstDep[0]):'—'}</p>
+    <div class="section-title">Conclusiones automáticas</div>
+    ${conclusiones.map(c=>`<div class="alert alert-info">${c}</div>`).join('')}
+  </div>`;
+  document.getElementById('repOutput').innerHTML=html;
+  if(publicMode) toast('Resumen público generado (bankroll oculto)');
+}
+function toCSV(rows,headers){
+  const esc2=v=>{ if(v===null||v===undefined) return ''; const s=String(v).replace(/"/g,'""'); return /[",\n]/.test(s)?`"${s}"`:s; };
+  return headers.join(',')+'\n'+rows.map(r=>headers.map(h=>esc2(r[h])).join(',')).join('\n');
+}
+function downloadFile(name,content,type='text/csv'){
+  const blob=new Blob([content],{type}); const url=URL.createObjectURL(blob);
+  const a=document.createElement('a'); a.href=url; a.download=name; a.click(); URL.revokeObjectURL(url);
+}
+function exportBetsCSV(){
+  const headers=['id','fecha','hora','deporte','liga','evento','mercado','seleccion','casa','cuota','stake','tipo','categoria','estado','gananciaNeta','retornoTotal','fechaResolucion','publicado','cuotaCierre'];
+  downloadFile('apuestas.csv', toCSV(DATA.bets,headers)); toast('CSV de apuestas descargado');
+}
+function exportMovementsCSV(){
+  downloadFile('movimientos.csv', toCSV(DATA.movements,['id','fecha','tipo','monto','nota'])); toast('CSV de movimientos descargado');
+}
+
+/* ============================= CONFIG ============================= */
+function renderConfig(el){
+  const c=DATA.config;
+  el.innerHTML=`
+  <div class="card">
+    <div class="section-title">Datos del proyecto</div>
+    <div class="grid grid-3">
+      <div class="field"><label>Nombre del proyecto</label><input id="c_nombre" value="${esc(c.nombre)}"></div>
+      <div class="field"><label>Moneda</label><select id="c_moneda">${['COP','USD','EUR'].map(m=>`<option ${c.moneda===m?'selected':''}>${m}</option>`).join('')}</select></div>
+      <div class="field"><label>Fecha de inicio</label><input type="date" id="c_fechaInicio" value="${c.fechaInicio}"></div>
+      <div class="field"><label>Bankroll inicial</label><input type="number" id="c_bankrollInicial" value="${c.bankrollInicial}"></div>
+      <div class="field"><label>Bankroll objetivo</label><input type="number" id="c_bankrollObjetivo" value="${c.bankrollObjetivo}"></div>
+      <div class="field"><label>Método de unidad</label><select id="c_metodoUnidad"><option value="fijo" ${c.metodoUnidad==='fijo'?'selected':''}>Valor fijo</option><option value="porcentaje" ${c.metodoUnidad==='porcentaje'?'selected':''}>Porcentaje del bankroll</option></select></div>
+      <div class="field"><label>Valor fijo de 1 unidad</label><input type="number" id="c_valorUnidad" value="${c.valorUnidad}"></div>
+      <div class="field"><label>% del bankroll = 1 unidad</label><input type="number" step="0.1" id="c_porcentajeUnidad" value="${c.porcentajeUnidad}"></div>
+    </div>
+    <div class="section-title">Límites de riesgo</div>
+    <div class="grid grid-3">
+      <div class="field"><label>Límite máx. por apuesta (% bankroll)</label><input type="number" id="c_limiteApuestaPct" value="${c.limiteApuestaPct}"></div>
+      <div class="field"><label>Límite pérdida diaria (%)</label><input type="number" id="c_limitePerdidaDiariaPct" value="${c.limitePerdidaDiariaPct}"></div>
+      <div class="field"><label>Límite pérdida semanal (%)</label><input type="number" id="c_limitePerdidaSemanalPct" value="${c.limitePerdidaSemanalPct}"></div>
+      <div class="field"><label>Alerta de drawdown (%)</label><input type="number" id="c_drawdownAlertaPct" value="${c.drawdownAlertaPct}"></div>
+      <div class="field"><label>Alerta de racha de pérdidas</label><input type="number" id="c_rachaPerdidasAlerta" value="${c.rachaPerdidasAlerta}"></div>
+    </div>
+    <div class="section-title">Deportes analizados</div>
+    <div class="pill-list" id="deportesPills"></div>
+    <div class="btn-row" style="margin-top:8px;"><input type="text" id="newDeporte" placeholder="Agregar deporte…" style="max-width:220px;"><button class="btn btn-sm" id="addDeporte">Agregar</button></div>
+    <div class="section-title">Casas de apuestas</div>
+    <div class="pill-list" id="casasPills"></div>
+    <div class="btn-row" style="margin-top:8px;"><input type="text" id="newCasa" placeholder="Agregar casa…" style="max-width:220px;"><button class="btn btn-sm" id="addCasa">Agregar</button></div>
+    <div class="btn-row" style="margin-top:22px;">
+      <button class="btn btn-gold" id="saveConfig">Guardar configuración</button>
+      <button class="btn" id="importBtn">Importar datos (JSON)</button>
+      <input type="file" id="importFile" accept="application/json" style="display:none">
+      <button class="btn btn-danger" id="clearDemo">${DATA.ui.demoSeeded? 'Eliminar datos de demostración':'Reiniciar todos los datos'}</button>
+    </div>
+  </div>`;
+  renderPills();
+  function renderPills(){
+    el.querySelector('#deportesPills').innerHTML=c.deportes.map((d,i)=>`<span class="pill-x">${esc(d)}<button data-rmdep="${i}">✕</button></span>`).join('');
+    el.querySelector('#casasPills').innerHTML=c.casas.map((cs,i)=>`<span class="pill-x">${esc(cs)}<button data-rmcasa="${i}">✕</button></span>`).join('');
+    el.querySelectorAll('[data-rmdep]').forEach(b=>b.addEventListener('click',()=>{ c.deportes.splice(+b.dataset.rmdep,1); renderPills(); }));
+    el.querySelectorAll('[data-rmcasa]').forEach(b=>b.addEventListener('click',()=>{ c.casas.splice(+b.dataset.rmcasa,1); renderPills(); }));
+  }
+  el.querySelector('#addDeporte').addEventListener('click',()=>{ const v=el.querySelector('#newDeporte').value.trim(); if(v){c.deportes.push(v); el.querySelector('#newDeporte').value=''; renderPills();} });
+  el.querySelector('#addCasa').addEventListener('click',()=>{ const v=el.querySelector('#newCasa').value.trim(); if(v){c.casas.push(v); el.querySelector('#newCasa').value=''; renderPills();} });
+  el.querySelector('#saveConfig').addEventListener('click',()=>{
+    c.nombre=el.querySelector('#c_nombre').value; c.moneda=el.querySelector('#c_moneda').value;
+    c.fechaInicio=el.querySelector('#c_fechaInicio').value; c.bankrollInicial=Number(el.querySelector('#c_bankrollInicial').value);
+    c.bankrollObjetivo=Number(el.querySelector('#c_bankrollObjetivo').value); c.metodoUnidad=el.querySelector('#c_metodoUnidad').value;
+    c.valorUnidad=Number(el.querySelector('#c_valorUnidad').value); c.porcentajeUnidad=Number(el.querySelector('#c_porcentajeUnidad').value);
+    c.limiteApuestaPct=Number(el.querySelector('#c_limiteApuestaPct').value); c.limitePerdidaDiariaPct=Number(el.querySelector('#c_limitePerdidaDiariaPct').value);
+    c.limitePerdidaSemanalPct=Number(el.querySelector('#c_limitePerdidaSemanalPct').value); c.drawdownAlertaPct=Number(el.querySelector('#c_drawdownAlertaPct').value);
+    c.rachaPerdidasAlerta=Number(el.querySelector('#c_rachaPerdidasAlerta').value);
+    saveData(); render(); toast('Configuración guardada');
+  });
+  el.querySelector('#clearDemo').addEventListener('click',()=>{ if(confirm('¿Seguro que deseas eliminar todos los datos y reiniciar el proyecto?')) clearDemoData(); });
+  el.querySelector('#importBtn').addEventListener('click',()=>el.querySelector('#importFile').click());
+  el.querySelector('#importFile').addEventListener('change',e=>{
+    const file=e.target.files[0]; if(!file) return;
+    const reader=new FileReader();
+    reader.onload=ev=>{
+      try{ const imported=JSON.parse(ev.target.result);
+        if(imported.bets && Array.isArray(imported.bets)){ DATA=imported; saveData(); render(); toast('Datos importados correctamente'); }
+        else toast('⚠️ El archivo no tiene el formato esperado');
+      }catch(err){ toast('⚠️ Error al leer el archivo JSON'); }
+    };
+    reader.readAsText(file);
+  });
+}
+
+/* ============================= BACKUP ============================= */
+function doBackup(){
+  downloadFile('backup-bankroll-'+todayStr()+'.json', JSON.stringify(DATA,null,2), 'application/json');
+  toast('Copia de seguridad descargada');
+}
+
+/* ============================= INIT ============================= */
+async function init(){
+  await loadData();
+  document.body.setAttribute('data-theme',DATA.ui.theme||'dark');
+  document.getElementById('themeToggle').textContent=(DATA.ui.theme==='light')? '☀️ Modo claro':'🌙 Modo oscuro';
+  document.getElementById('loadingScreen').style.display='none';
+  document.getElementById('appRoot').classList.remove('hidden');
+  render();
+}
+document.getElementById('menuBtn').addEventListener('click',()=>document.getElementById('sidebar').classList.toggle('open'));
+document.getElementById('themeToggle').addEventListener('click',()=>{
+  DATA.ui.theme=(DATA.ui.theme==='light')?'dark':'light';
+  document.body.setAttribute('data-theme',DATA.ui.theme);
+  document.getElementById('themeToggle').textContent=(DATA.ui.theme==='light')? '☀️ Modo claro':'🌙 Modo oscuro';
+  saveData();
+  Object.values(CHARTS).forEach(ch=>ch&&ch.destroy()); CHARTS={};
+  render();
+});
+document.getElementById('btnNewBet').addEventListener('click',()=>openBetModal());
+document.getElementById('btnBackup').addEventListener('click',doBackup);
+document.getElementById('overlay').addEventListener('click',e=>{ if(e.target.id==='overlay') closeModal(); });
+init();
+</script>
+</body>
+</html>
