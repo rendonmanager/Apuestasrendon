@@ -673,11 +673,7 @@ function openBetModal(id){
     if(nb.estado!=='pendiente' && !nb.fechaResolucion) nb.fechaResolucion=nb.fecha;
     const calc=calcularApuesta(nb); nb.gananciaNeta=calc.ganancia; nb.retornoTotal=calc.retorno;
     
-form.addEventListener('submit', async e=>{
-  e.preventDefault();
-  const fd=new FormData(form);
-  if(Number(fd.get('cuota'))<1.01){ toast('⚠️ La cuota no puede ser inferior a 1.01'); return; }
-  if(Number(fd.get('stake'))<0){ toast('⚠️ El stake no puede ser negativo'); return; }
+
 
   const sportId = await resolveSportId(fd.get('deporte'));
   const bookmakerId = await resolveBookmakerId(fd.get('casa'));
