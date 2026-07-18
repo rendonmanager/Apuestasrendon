@@ -7,6 +7,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.4/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
 :root{
   --bg:#0B0F14; --surface:#131920; --surface-alt:#1B232C; --surface-hi:#212B35;
@@ -1262,10 +1263,16 @@ if (movForm) {
 
 /* ============================= INIT ============================= */
 async function init(){
-  supabase = supabaseClient.createClient(
-  'https://viurryyaolmlotkdpyyx.supabase.co',
-  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZpdXJyeXlhb2xtbG90a2RweXl4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQzMjczNjgsImV4cCI6MjA5OTkwMzM2OH0.CFhdhsNDI_VGsXUC3rSt9aneoWkIuS1fN7036gpuq7M'  // esta clave es pública por diseño
-);
+  const supabaseClientLib = window.supabase;
+  if (!supabaseClientLib) {
+    toast('⚠️ No se pudo cargar el cliente de Supabase');
+    return;
+  }
+
+  supabase = supabaseClientLib.createClient(
+    'https://viurryyaolmlotkdpyyx.supabase.co',
+    'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZpdXJyeXlhb2xtbG90a2RweXl4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQzMjczNjgsImV4cCI6MjA5OTkwMzM2OH0.CFhdhsNDI_VGsXUC3rSt9aneoWkIuS1fN7036gpuq7M'  // esta clave es pública por diseño
+  );
 
   // ... tu creación del cliente de Supabase ya está aquí ...
   const user = await getSession();
