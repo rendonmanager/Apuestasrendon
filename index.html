@@ -1312,7 +1312,7 @@ async function init(){
   document.getElementById('loadingScreen').style.display='none';
   document.getElementById('appRoot').classList.remove('hidden');
   render();
-}
+
 document.getElementById('menuBtn').addEventListener('click',()=>document.getElementById('sidebar').classList.toggle('open'));
 document.getElementById('themeToggle').addEventListener('click',()=>{
   DATA.ui.theme=(DATA.ui.theme==='light')?'dark':'light';
