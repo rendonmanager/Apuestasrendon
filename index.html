@@ -234,7 +234,7 @@ const user = await getSession();
     ui:{theme: localStorage?.getItem?.('theme')||'dark'} // el tema puede quedarse local, no es dato de negocio
   };
 }
-}
+
 let saveTimer=null;
 async function saveData(){
   clearTimeout(saveTimer);
