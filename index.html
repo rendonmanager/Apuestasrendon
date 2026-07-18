@@ -193,6 +193,7 @@ tbody tr:hover{background:var(--surface-alt);}
 const STORE_KEY='tipster-app-data-v1';
 let DATA=null;
 let CHARTS={};
+let supabase = null;
 
 function defaultData(){
   return {
@@ -1259,37 +1260,9 @@ if (movForm) {
   });
 }
 
-// Eliminar movimiento
-el.querySelectorAll('[data-delmov]').forEach(b=>b.addEventListener('click', async ()=>{
-  await supabase.from('movements').delete().eq('id', b.dataset.delmov);
-  await loadData(); render();
-}));
-
-// Guardar configuración (tabla profiles)
-el.querySelector('#saveConfig').addEventListener('click', async ()=>{
-  const payload = {
-    nombre_proyecto: el.querySelector('#c_nombre').value,
-    moneda: el.querySelector('#c_moneda').value,
-    fecha_inicio: el.querySelector('#c_fechaInicio').value,
-    bankroll_inicial: Number(el.querySelector('#c_bankrollInicial').value),
-    bankroll_objetivo: Number(el.querySelector('#c_bankrollObjetivo').value),
-    metodo_unidad: el.querySelector('#c_metodoUnidad').value,
-    valor_unidad: Number(el.querySelector('#c_valorUnidad').value),
-    porcentaje_unidad: Number(el.querySelector('#c_porcentajeUnidad').value),
-    limite_apuesta_pct: Number(el.querySelector('#c_limiteApuestaPct').value),
-    limite_perdida_diaria_pct: Number(el.querySelector('#c_limitePerdidaDiariaPct').value),
-    limite_perdida_semanal_pct: Number(el.querySelector('#c_limitePerdidaSemanalPct').value),
-    drawdown_alerta_pct: Number(el.querySelector('#c_drawdownAlertaPct').value),
-    racha_perdidas_alerta: Number(el.querySelector('#c_rachaPerdidasAlerta').value),
-  };
-  const {error} = await supabase.from('profiles').update(payload).eq('id', currentUser.id);
-  if(error){ toast('⚠️ Error: '+error.message); return; }
-  await loadData(); render(); toast('Configuración guardada');
-});
-  
 /* ============================= INIT ============================= */
 async function init(){
-  const supabase = supabaseClient.createClient(
+  supabase = supabaseClient.createClient(
   'https://viurryyaolmlotkdpyyx.supabase.co',
   'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZpdXJyeXlhb2xtbG90a2RweXl4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQzMjczNjgsImV4cCI6MjA5OTkwMzM2OH0.CFhdhsNDI_VGsXUC3rSt9aneoWkIuS1fN7036gpuq7M'  // esta clave es pública por diseño
 );
