@@ -210,13 +210,30 @@ function defaultData(){
 }
 
 async function loadData(){
-  try{
-    const r=await localStorage.getItem(STORE_KEY,false);
-    if(r && r.value){ DATA=JSON.parse(r.value); return; }
-  }catch(e){ /* not found */ }
-  DATA=defaultData();
-  seedDemoData();
-  await saveData();
+const user = await getSession();
+  if(!user){ toast('⚠️ Debes iniciar sesión'); DATA=defaultData(); return; }
+
+  const [{data:profile}, {data:sports}, {data:bookmakers}, {data:bets}, {data:movements}, {data:diary}] = await Promise.all([
+    supabase.from('profiles').select('*').eq('id', user.id).single(),
+    supabase.from('sports').select('*').eq('profile_id', user.id),
+    supabase.from('bookmakers').select('*').eq('profile_id', user.id),
+    supabase.from('bets').select('*').eq('profile_id', user.id).order('fecha',{ascending:false}),
+    supabase.from('movements').select('*').eq('profile_id', user.id),
+    supabase.from('diary_entries').select('*').eq('profile_id', user.id),
+  ]);
+
+  const sportsMap = Object.fromEntries((sports||[]).map(s=>[s.id, s.nombre]));
+  const bookmakersMap = Object.fromEntries((bookmakers||[]).map(b=>[b.id, b.nombre]));
+
+  DATA = {
+    config: profileToConfig(profile),
+    _sports: sports||[], _bookmakers: bookmakers||[],
+    bets: (bets||[]).map(r=>betFromDb(r, sportsMap, bookmakersMap)),
+    movements: (movements||[]).map(movFromDb),
+    diary: (diary||[]).map(diaryFromDb),
+    ui:{theme: localStorage?.getItem?.('theme')||'dark'} // el tema puede quedarse local, no es dato de negocio
+  };
+}
 }
 let saveTimer=null;
 async function saveData(){
@@ -655,16 +672,44 @@ function openBetModal(id){
     nb.cuotaCierre = nb.cuotaCierre? Number(nb.cuotaCierre): null;
     if(nb.estado!=='pendiente' && !nb.fechaResolucion) nb.fechaResolucion=nb.fecha;
     const calc=calcularApuesta(nb); nb.gananciaNeta=calc.ganancia; nb.retornoTotal=calc.retorno;
-    if(editing){
-      nb.editHistory=[...(editing.editHistory||[]), {ts:new Date().toISOString(), prev:{estado:editing.estado,stake:editing.stake,cuota:editing.cuota}}];
-      nb.updatedAt=new Date().toISOString();
-      const idx=DATA.bets.findIndex(x=>x.id===id); DATA.bets[idx]=nb;
-    } else {
-      nb.createdAt=new Date().toISOString();
-      DATA.bets.push(nb);
-    }
-    saveData(); closeModal(); render(); toast(editing?'Apuesta actualizada':'Apuesta registrada');
-  });
+    
+form.addEventListener('submit', async e=>{
+  e.preventDefault();
+  const fd=new FormData(form);
+  if(Number(fd.get('cuota'))<1.01){ toast('⚠️ La cuota no puede ser inferior a 1.01'); return; }
+  if(Number(fd.get('stake'))<0){ toast('⚠️ El stake no puede ser negativo'); return; }
+
+  const sportId = await resolveSportId(fd.get('deporte'));
+  const bookmakerId = await resolveBookmakerId(fd.get('casa'));
+
+  const payload = {
+    profile_id: currentUser.id,
+    sport_id: sportId, bookmaker_id: bookmakerId,
+    fecha: fd.get('fecha'), hora: fd.get('hora')||null,
+    liga: fd.get('liga'), evento: fd.get('evento'), mercado: fd.get('mercado'), seleccion: fd.get('seleccion'),
+    cuota: Number(fd.get('cuota')), stake: Number(fd.get('stake')),
+    tipo: fd.get('tipo'), categoria: fd.get('categoria'), estado: fd.get('estado'),
+    valor_recibido: fd.get('valorRecibido')? Number(fd.get('valorRecibido')): null,
+    fecha_resolucion: fd.get('fechaResolucion')||null,
+    tipster: fd.get('tipster'), etiquetas: fd.get('etiquetas'),
+    comentarios: fd.get('comentarios'), justificacion: fd.get('justificacion'), riesgos: fd.get('riesgos'),
+    evidencia: fd.get('evidencia'), publicado: fd.get('publicado')==='true',
+    cuota_cierre: fd.get('cuotaCierre')? Number(fd.get('cuotaCierre')): null
+    // ganancia_neta y retorno_total NO se envían: el trigger de Postgres los calcula solo
+  };
+
+  let result;
+  if(editing){
+    result = await supabase.from('bets').update(payload).eq('id', editing.id).select().single();
+  } else {
+    result = await supabase.from('bets').insert(payload).select().single();
+  }
+  if(result.error){ toast('⚠️ Error: '+result.error.message); return; }
+
+  await loadData(); // recarga desde la fuente de verdad
+  closeModal(); render();
+  toast(editing?'Apuesta actualizada':'Apuesta registrada');
+});
 }
 function selectOrInput(name,list,val){
   return `<select name="${name}">${list.map(o=>`<option ${o===val?'selected':''}>${esc(o)}</option>`).join('')}${val&&!list.includes(val)?`<option selected>${esc(val)}</option>`:''}</select>`;
@@ -1131,8 +1176,136 @@ function doBackup(){
   toast('Copia de seguridad descargada');
 }
 
-/* ============================= INIT ============================= */
+let currentUser = null;
+
+async function getSession(){
+  const { data: { user } } = await supabase.auth.getUser();
+  currentUser = user;
+  return user;
+}
+
+// Convierte una fila de bets (snake_case + FKs) al formato que ya usa tu UI
+function betFromDb(row, sportsMap, bookmakersMap){
+  return {
+    id: row.id,
+    fecha: row.fecha, hora: row.hora,
+    deporte: sportsMap[row.sport_id] || '',
+    liga: row.liga, evento: row.evento, mercado: row.mercado, seleccion: row.seleccion,
+    casa: bookmakersMap[row.bookmaker_id] || '',
+    cuota: Number(row.cuota), stake: Number(row.stake),
+    tipo: row.tipo, categoria: row.categoria, estado: row.estado,
+    valorRecibido: row.valor_recibido, gananciaNeta: row.ganancia_neta, retornoTotal: row.retorno_total,
+    fechaResolucion: row.fecha_resolucion, tipster: row.tipster, etiquetas: row.etiquetas,
+    comentarios: row.comentarios, justificacion: row.justificacion, riesgos: row.riesgos,
+    resultadoReal: row.resultado_real, evidencia: row.evidencia,
+    publicado: row.publicado, cuotaCierre: row.cuota_cierre,
+    createdAt: row.created_at, updatedAt: row.updated_at,
+    _sportId: row.sport_id, _bookmakerId: row.bookmaker_id // guardamos los ids reales para updates
+  };
+}
+function profileToConfig(p){
+  return {
+    nombre:p.nombre_proyecto, moneda:p.moneda, bankrollInicial:Number(p.bankroll_inicial),
+    fechaInicio:p.fecha_inicio, metodoUnidad:p.metodo_unidad, valorUnidad:Number(p.valor_unidad),
+    porcentajeUnidad:Number(p.porcentaje_unidad), bankrollObjetivo:Number(p.bankroll_objetivo),
+    limiteApuestaPct:Number(p.limite_apuesta_pct), limitePerdidaDiariaPct:Number(p.limite_perdida_diaria_pct),
+    limitePerdidaSemanalPct:Number(p.limite_perdida_semanal_pct), drawdownAlertaPct:Number(p.drawdown_alerta_pct),
+    rachaPerdidasAlerta:p.racha_perdidas_alerta,
+    deportes:(DATA?._sports||[]).map(s=>s.nombre), casas:(DATA?._bookmakers||[]).map(b=>b.nombre)
+  };
+}
+function movFromDb(r){ return {id:r.id, fecha:r.fecha, tipo:r.tipo, monto:Number(r.monto), nota:r.nota}; }
+function diaryFromDb(r){ return {id:r.id, fecha:r.fecha, estadoEmocional:r.estado_emocional, confianza:r.confianza, objetivo:r.objetivo, analisisPrevio:r.analisis_previo, errores:r.errores, aprendizajes:r.aprendizajes, cambios:r.cambios, comentarios:r.comentarios}; }
+
+async function resolveSportId(nombre){
+  let s = DATA._sports.find(s=>s.nombre===nombre);
+  if(s) return s.id;
+  const {data,error} = await supabase.from('sports').insert({profile_id:currentUser.id, nombre}).select().single();
+  if(error){ toast('⚠️ Error creando deporte: '+error.message); return null; }
+  DATA._sports.push(data); return data.id;
+}
+async function resolveBookmakerId(nombre){
+  let b = DATA._bookmakers.find(b=>b.nombre===nombre);
+  if(b) return b.id;
+  const {data,error} = await supabase.from('bookmakers').insert({profile_id:currentUser.id, nombre}).select().single();
+  if(error){ toast('⚠️ Error creando casa: '+error.message); return null; }
+  DATA._bookmakers.push(data); return data.id;
+}
+  
+async function deleteBet(id){
+  if(!confirm('¿Eliminar esta apuesta? Esta acción no se puede deshacer.')) return;
+  const {error} = await supabase.from('bets').delete().eq('id', id);
+  if(error){ toast('⚠️ Error: '+error.message); return; }
+  await loadData(); render(); toast('Apuesta eliminada');
+}
+
+async function duplicateBet(id){
+  const b = DATA.bets.find(x=>x.id===id); if(!b) return;
+  const {data, error} = await supabase.from('bets').insert({
+    profile_id: currentUser.id, sport_id: b._sportId, bookmaker_id: b._bookmakerId,
+    fecha: todayStr(), hora:b.hora, liga:b.liga, evento:b.evento, mercado:b.mercado, seleccion:b.seleccion,
+    cuota:b.cuota, stake:b.stake, tipo:b.tipo, categoria:b.categoria, estado:'pendiente'
+  }).select().single();
+  if(error){ toast('⚠️ Error: '+error.message); return; }
+  await loadData(); render(); toast('Apuesta duplicada');
+}
+
+
+  // Movimientos
+document.getElementById('movForm').addEventListener('submit', async e=>{
+  e.preventDefault(); const fd=new FormData(e.target);
+  const {error} = await supabase.from('movements').insert({
+    profile_id: currentUser.id, fecha: fd.get('fecha'), tipo: fd.get('tipo'),
+    monto: Number(fd.get('monto')), nota: fd.get('nota')
+  });
+  if(error){ toast('⚠️ Error: '+error.message); return; }
+  await loadData(); closeModal(); render(); toast('Movimiento registrado');
+});
+
+// Eliminar movimiento
+el.querySelectorAll('[data-delmov]').forEach(b=>b.addEventListener('click', async ()=>{
+  await supabase.from('movements').delete().eq('id', b.dataset.delmov);
+  await loadData(); render();
+}));
+
+// Guardar configuración (tabla profiles)
+el.querySelector('#saveConfig').addEventListener('click', async ()=>{
+  const payload = {
+    nombre_proyecto: el.querySelector('#c_nombre').value,
+    moneda: el.querySelector('#c_moneda').value,
+    fecha_inicio: el.querySelector('#c_fechaInicio').value,
+    bankroll_inicial: Number(el.querySelector('#c_bankrollInicial').value),
+    bankroll_objetivo: Number(el.querySelector('#c_bankrollObjetivo').value),
+    metodo_unidad: el.querySelector('#c_metodoUnidad').value,
+    valor_unidad: Number(el.querySelector('#c_valorUnidad').value),
+    porcentaje_unidad: Number(el.querySelector('#c_porcentajeUnidad').value),
+    limite_apuesta_pct: Number(el.querySelector('#c_limiteApuestaPct').value),
+    limite_perdida_diaria_pct: Number(el.querySelector('#c_limitePerdidaDiariaPct').value),
+    limite_perdida_semanal_pct: Number(el.querySelector('#c_limitePerdidaSemanalPct').value),
+    drawdown_alerta_pct: Number(el.querySelector('#c_drawdownAlertaPct').value),
+    racha_perdidas_alerta: Number(el.querySelector('#c_rachaPerdidasAlerta').value),
+  };
+  const {error} = await supabase.from('profiles').update(payload).eq('id', currentUser.id);
+  if(error){ toast('⚠️ Error: '+error.message); return; }
+  await loadData(); render(); toast('Configuración guardada');
+});
+  
+/ ============================= INIT ============================= */
 async function init(){
+  const supabase = supabaseClient.createClient(
+  'https://viurryyaolmlotkdpyyx.supabase.co',
+  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZpdXJyeXlhb2xtbG90a2RweXl4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQzMjczNjgsImV4cCI6MjA5OTkwMzM2OH0.CFhdhsNDI_VGsXUC3rSt9aneoWkIuS1fN7036gpuq7M'  // esta clave es pública por diseño
+);
+  async function init(){
+  // ... tu creación del cliente de Supabase ya está aquí ...
+  const user = await getSession();
+  if(!user){
+    // redirige a tu pantalla de login o muestra un formulario de auth
+    document.getElementById('loadingScreen').style.display='none';
+    // ...
+    return;
+  }
+ 
   await loadData();
   document.body.setAttribute('data-theme',DATA.ui.theme||'dark');
   document.getElementById('themeToggle').textContent=(DATA.ui.theme==='light')? '☀️ Modo claro':'🌙 Modo oscuro';
