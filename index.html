@@ -234,7 +234,6 @@ const user = await getSession();
     ui:{theme: localStorage?.getItem?.('theme')||'dark'} // el tema puede quedarse local, no es dato de negocio
   };
 }
-}
 let saveTimer=null;
 async function saveData(){
   clearTimeout(saveTimer);
@@ -660,7 +659,7 @@ function openBetModal(id){
       : `Ganancia/pérdida neta estimada: <b class="${c.ganancia>=0?'pos':'neg'}">${fmtMoney(c.ganancia)}</b> · Retorno total: <b>${fmtMoney(c.retorno)}</b>`;
   }
   updatePreview();
-  form.addEventListener('submit',e=>{
+  form.addEventListener('submit', async e=>{
     e.preventDefault();
     const fd=new FormData(form);
     if(Number(fd.get('cuota'))<1.01){ toast('⚠️ La cuota no puede ser inferior a 1.01'); return; }
@@ -672,12 +671,6 @@ function openBetModal(id){
     nb.cuotaCierre = nb.cuotaCierre? Number(nb.cuotaCierre): null;
     if(nb.estado!=='pendiente' && !nb.fechaResolucion) nb.fechaResolucion=nb.fecha;
     const calc=calcularApuesta(nb); nb.gananciaNeta=calc.ganancia; nb.retornoTotal=calc.retorno;
-    
-form.addEventListener('submit', async e=>{
-  e.preventDefault();
-  const fd=new FormData(form);
-  if(Number(fd.get('cuota'))<1.01){ toast('⚠️ La cuota no puede ser inferior a 1.01'); return; }
-  if(Number(fd.get('stake'))<0){ toast('⚠️ El stake no puede ser negativo'); return; }
 
   const sportId = await resolveSportId(fd.get('deporte'));
   const bookmakerId = await resolveBookmakerId(fd.get('casa'));
@@ -1290,7 +1283,7 @@ el.querySelector('#saveConfig').addEventListener('click', async ()=>{
   await loadData(); render(); toast('Configuración guardada');
 });
   
-/ ============================= INIT ============================= */
+/* ============================= INIT ============================= */
 async function init(){
   const supabase = supabaseClient.createClient(
   'https://viurryyaolmlotkdpyyx.supabase.co',
@@ -1325,6 +1318,7 @@ document.getElementById('themeToggle').addEventListener('click',()=>{
 document.getElementById('btnNewBet').addEventListener('click',()=>openBetModal());
 document.getElementById('btnBackup').addEventListener('click',doBackup);
 document.getElementById('overlay').addEventListener('click',e=>{ if(e.target.id==='overlay') closeModal(); });
+}
 init();
 </script>
 </body>
