@@ -1246,15 +1246,18 @@ async function duplicateBet(id){
 
 
   // Movimientos
-document.getElementById('movForm').addEventListener('submit', async e=>{
-  e.preventDefault(); const fd=new FormData(e.target);
-  const {error} = await supabase.from('movements').insert({
-    profile_id: currentUser.id, fecha: fd.get('fecha'), tipo: fd.get('tipo'),
-    monto: Number(fd.get('monto')), nota: fd.get('nota')
+const movForm = document.getElementById('movForm');
+if (movForm) {
+  movForm.addEventListener('submit', async e=>{
+    e.preventDefault(); const fd=new FormData(e.target);
+    const {error} = await supabase.from('movements').insert({
+      profile_id: currentUser.id, fecha: fd.get('fecha'), tipo: fd.get('tipo'),
+      monto: Number(fd.get('monto')), nota: fd.get('nota')
+    });
+    if(error){ toast('⚠️ Error: '+error.message); return; }
+    await loadData(); closeModal(); render(); toast('Movimiento registrado');
   });
-  if(error){ toast('⚠️ Error: '+error.message); return; }
-  await loadData(); closeModal(); render(); toast('Movimiento registrado');
-});
+}
 
 // Eliminar movimiento
 el.querySelectorAll('[data-delmov]').forEach(b=>b.addEventListener('click', async ()=>{
